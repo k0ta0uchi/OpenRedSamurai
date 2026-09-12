@@ -88,6 +88,10 @@ with status `pass`, result SHA-256
 `0ED38C5F3FDE93B37426D9F97293268D8971A83F2685E4908F0EAEA9B5D4EA9A`, summary
 SHA-256 `C17B5CC1583AC941BB4B2107DFE63A4F430A5712ED5E26031FD048E8E1773B3E`,
 and zero tracked processes after the audit.
+The external compatibility manifest at
+`C:\Workspace\OpenRedSamurai\captures\official-compatibility-manifest-20260912.json`
+was refreshed with the final hashes and has SHA-256
+`7AACFDFA256BFC0832C20A1ECF9C95F393ABE979E2DACED84AA5ABC171042FF3`.
 The final UI accessibility smoke passed with 36/34/74/20 nodes and the
 installer update identifier; its editor executable SHA-256 is
 `6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62`.
