@@ -109,6 +109,9 @@ three resolved the same local AppData fallback and returned exit code 0.
 
 The native updater GUI was smoke-tested against the private GitHub repository
 with a short-lived `gh auth token`: it displayed the current release and no
-404/error state. The token is read only from the launching environment and is
-never written to disk. The package manifest and sidecar above were generated
-after the final release build.
+404/error state. The result is
+`C:\Workspace\OpenRedSamurai\redsamurai-config\captures\installer-update-auth-20260912\result.json`
+(SHA-256 `0BC14B083BAC7B2ED541663579EA80412D063CD6BC6E2D551E3D15D1535924BC`).
+The token is read only from the launching environment and is never written to
+disk. The package manifest and sidecar above were generated after the final
+release build.
