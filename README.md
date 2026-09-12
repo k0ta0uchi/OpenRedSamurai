@@ -42,16 +42,23 @@ not guessed or silently enabled.
 
    ```powershell
    Set-Location 'C:\Path\to\OpenRedSamurai-v1.0.0-windows-x64'
-   .\setup.ps1 -WhatIf
-   .\setup.ps1
+   .\setup.cmd -WhatIf
+   .\setup.cmd
    ```
 
-   The installer copies `redsamurai-config.exe` to the current user's LocalAppData,
-   creates the product data directory under Documents, and registers one quoted
-   `--tray` command under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
-   It does not elevate or write machine-wide state. To remove the installation while
-   preserving user data, run `.\setup.ps1 -Uninstall -WhatIf` and then repeat without
-   `-WhatIf`.
+   `setup.cmd` starts PowerShell with a process-scoped execution-policy bypass;
+   it does not change the machine or user policy. If you invoke the script
+   directly, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+   in that PowerShell window first. The installer copies `redsamurai-config.exe`
+   to the current user's LocalAppData, creates the product data directory under
+   Documents when that folder is local, and automatically uses
+   `%LOCALAPPDATA%\OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse` when
+   Documents is redirected through a cloud reparse point. You can override the
+   path with `-DataDirectory` when invoking `installer/install.ps1` directly.
+   It registers one quoted `--tray` command under
+   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. It does not elevate
+   or write machine-wide state. To remove the installation while preserving user
+   data, run `.\setup.cmd -Uninstall -WhatIf` and then repeat without `-WhatIf`.
 
 The packaged `installer/` directory contains the individual reviewed scripts for
 auditing or controlled automation. Close the tray process before uninstalling.
@@ -80,7 +87,10 @@ The script writes the zip, SHA-256 sidecar, and a machine-readable manifest to
 ## Safety and data boundaries
 
 All installation state is current-user state. The product data directory is kept in
-`Documents\RED SAMURAI 16400DPI Gaming Mouse`; uninstall deliberately preserves it.
+`Documents\RED SAMURAI 16400DPI Gaming Mouse` when Documents is local. If the
+known folder is redirected through OneDrive or another reparse-point provider,
+the installer uses `%LOCALAPPDATA%\OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse`
+instead. Uninstall deliberately preserves whichever data directory was resolved.
 The application starts with a dry-run plan, performs no HID I/O on startup, and only
 allows the complete verified Apply sequence to cross the device boundary. Local
 captures and generated hardware evidence stay outside the repository and are ignored

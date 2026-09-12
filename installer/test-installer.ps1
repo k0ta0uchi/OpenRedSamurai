@@ -165,6 +165,27 @@ try {
 
     . $commonScript
     . $startupHelperScript
+    $originalReparseProbe = (Get-Command Test-PathTraversesReparsePoint -CommandType Function).ScriptBlock
+    try {
+        # Force the branch that is difficult to reproduce on every test host:
+        # a cloud-redirected Documents known folder.  The resolver must use a
+        # deterministic local path, while explicit paths remain fail-closed.
+        Set-Item -Path Function:Test-PathTraversesReparsePoint -Value {
+            param([string] $Path)
+            return $true
+        }
+        if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+            throw 'LOCALAPPDATA is required for the default data fallback test.'
+        }
+        $forcedFallback = Get-DefaultDataDirectory -ProductName 'RED SAMURAI 16400DPI Gaming Mouse'
+        $expectedFallback = Join-Path $env:LOCALAPPDATA 'OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse'
+        if ($forcedFallback -cne $expectedFallback) {
+            throw 'redirected Documents did not resolve to the deterministic local fallback.'
+        }
+    }
+    finally {
+        Set-Item -Path Function:Test-PathTraversesReparsePoint -Value $originalReparseProbe
+    }
     if ((Assert-SafeAbsolutePath -Path 'C:\Users\tester\Install' `
             -Name 'InstallDirectory' -DisallowRoot) -cne 'C:\Users\tester\Install') {
         throw 'validated path was not returned deterministically'

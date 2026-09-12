@@ -58,7 +58,8 @@ $files = @(
     @{ Source = (Join-Path $repoRoot 'installer\common.ps1'); Relative = 'installer\common.ps1' },
     @{ Source = (Join-Path $repoRoot 'installer\setup.ps1'); Relative = 'installer\setup.ps1' },
     @{ Source = (Join-Path $repoRoot 'installer\README.md'); Relative = 'installer\README.md' },
-    @{ Source = (Join-Path $repoRoot 'setup.ps1'); Relative = 'setup.ps1' }
+    @{ Source = (Join-Path $repoRoot 'setup.ps1'); Relative = 'setup.ps1' },
+    @{ Source = (Join-Path $repoRoot 'setup.cmd'); Relative = 'setup.cmd' }
 )
 
 foreach ($file in $files) {
@@ -87,6 +88,7 @@ $manifest = [ordered]@{
         bytes = (Get-Item (Join-Path $stage 'assets\icons\redsamurai.ico')).Length
     }
     installer = 'setup.ps1'
+    launcher = 'setup.cmd'
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $stage 'release-manifest.json') -Encoding UTF8
 

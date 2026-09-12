@@ -6,7 +6,9 @@
     This installer intentionally uses HKCU rather than HKLM.  It does not
     require elevation, does not create a service, and registers one stable
     per-user Run value that starts the application in tray mode.  Use -WhatIf
-    to inspect every write before applying it.
+    to inspect every write before applying it.  A local Documents folder is
+    preferred; when the Windows known folder traverses a cloud reparse point,
+    the default data directory falls back to %LOCALAPPDATA%\OpenRedSamurai.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(

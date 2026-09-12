@@ -4,8 +4,17 @@
 [ROADMAP.md](ROADMAP.md) / [VERIFICATION.md](VERIFICATION.md) を参照してください。
 
 現在の配布版は **v1.0.0** です。GitHub Releases の Windows x64 zip に含まれる
-`setup.ps1` を、展開したフォルダーから PowerShell で実行すると、現在のユーザーだけに
-インストールできます（管理者権限不要）。
+`setup.cmd` を、展開したフォルダーから実行すると、現在のユーザーだけに
+インストールできます（管理者権限不要）。`setup.cmd` はプロセス限定で
+PowerShell の実行ポリシーを bypass するため、システムのポリシーは変更しません。
+`.\setup.ps1` を直接実行する場合は、同じPowerShellで
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` を先に実行してください。
+
+Windowsの「ドキュメント」がOneDriveなどの再解析ポイントへリダイレクトされている場合、
+安全検査を維持するため、データは自動的に
+`%LOCALAPPDATA%\OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse` へ保存されます。
+ローカルのDocumentsを使いたい場合は、個別スクリプトへ既存のローカル絶対パスを
+`-DataDirectory` として明示できます。
 
 RED SAMURAI 16400DPI Gaming Mouse (VID_04D9/PID_FC55) 用の設定ツール — 純正ソフトを
 常駐させずに使えるRust + eguiによる再実装。

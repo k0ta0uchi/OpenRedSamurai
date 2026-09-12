@@ -43,8 +43,9 @@ second, independently computed SHA-256 sidecar and `release-manifest.json`.
 
 - `redsamurai-config.exe` is built from this source and contains the multi-size
   `assets/icons/redsamurai.ico` Windows resource.
-- `setup.ps1` installs through `HKCU` only, requires no elevation, and preserves
-  Documents data during uninstall.
+- `setup.cmd`/`setup.ps1` install through `HKCU` only, require no elevation, and
+  preserve the resolved product data directory during uninstall. A redirected
+  OneDrive Documents folder automatically uses the local AppData fallback.
 - `README.md` and `README.ja.md` describe the same v1.0.0 scope and deferred
   boundaries.
 - `installer/package-release.ps1` produces the Windows x64 zip and hash sidecar.
@@ -56,7 +57,7 @@ The final package produced from this tree is:
 | `target/release/redsamurai-config.exe` | `6557F26013404C565271E366E6EA4476DA81BEA6B685BE40C1021BD701DB2F6C` |
 | `target/release/examples/live_probe.exe` | `DA019C2DFA2E397A68B5784FBF71EE08FF6BFB5CCC027AE51C651BD25542E00C` |
 | `assets/icons/redsamurai.ico` | `D3BED40A1D12889D106AF06B6E9FFE9B6A47B93C7CF50A8EEA53280A01F68F5B` |
-| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `1DD63D4FAE47A7548C2E04E8855253D45D32ED31373751F046ED5E3EDC84B730` |
+| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `C051ED2BE836B440092998AA4968C9F713F72E47F08BBF69560ECBCA4A3818E5` |
 
 The same values are recorded in the zip's `release-manifest.json`, the SHA-256
 sidecar, and the GitHub release notes.
@@ -68,5 +69,13 @@ Its result is PASS with SHA-256
 summary SHA-256 is
 `82AF95452A3F3896D2081B98DB535ACE2CA04A8C6D4CB9CD83D72842B45980A8`.
 The external compatibility manifest was updated with the final binary, audit,
-and package values (SHA-256
-`024CA04EB7FD0A0AD37CE741C19F4A526957672096A06D8444BE27DEA972AE78`).\n
+installer fallback audit, and package values (SHA-256
+`AA1F35DB76637062AC9572F7DF808C9D84BB061F71FA3498062989ABF5056B64`).
+
+The installer fallback audit at
+`C:\Workspace\OpenRedSamurai\captures\installer-fallback-audit-20260912-131509\result.json`
+is PASS (SHA-256
+`A4A1443D623896B42F610C44639F6437361110046D22A6C05ABC3625D35B699E`). It
+ran `setup.cmd -WhatIf`, direct `setup.ps1` with a process-scoped bypass, and
+uninstall WhatIf against the OneDrive-redirected Documents environment; all
+three resolved the same local AppData fallback and returned exit code 0.

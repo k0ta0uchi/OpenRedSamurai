@@ -71,7 +71,7 @@ PE import/exportの機械可読な補助記録は
 判断・対象collection・公式バイナリのハッシュ・現行Rustハッシュ・静的監査結果を
 機械可読に束ねた台帳は
 [`official-compatibility-manifest-20260912.json`](../captures/official-compatibility-manifest-20260912.json)
-（SHA-256 `024CA04EB7FD0A0AD37CE741C19F4A526957672096A06D8444BE27DEA972AE78`）である。
+（SHA-256 `AA1F35DB76637062AC9572F7DF808C9D84BB061F71FA3498062989ABF5056B64`）である。
 
 2026-09-11 20:09 JSTの重複抑止実機監査は **FAIL**。SIDE 7の対象Raw Inputは
 press/release各1件を受信したが、hardware VK `0x31` とRust injected VK `0x31`が
@@ -829,7 +829,7 @@ M2のRust-only DPI readbackは両Runとも8バイト短縮応答でfail-closed�
 - 現行テスト証跡: `../captures/release-acceptance-tests-20260912-120307/result.json`
   （295テスト、status=pass）
 - 互換性マニフェスト: `../captures/official-compatibility-manifest-20260912.json`
-  （SHA-256 `024CA04EB7FD0A0AD37CE741C19F4A526957672096A06D8444BE27DEA972AE78`）
+  （SHA-256 `AA1F35DB76637062AC9572F7DF808C9D84BB061F71FA3498062989ABF5056B64`）
 
 Report-03完全再接続文脈、kernel filter／test-signed driver、active全キーボードrelay、
 未検証P2 wire mappingは、影響と再開条件を記録した`DEFERRED-BY-DESIGN`の非ブロッキング

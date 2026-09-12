@@ -39,6 +39,3 @@ if ($PSBoundParameters.ContainsKey('DataDirectory')) {
 if ($WhatIfPreference) { $invoke.WhatIf = $true }
 
 & $delegate @invoke
-if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}

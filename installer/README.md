@@ -1,17 +1,21 @@
 # RED SAMURAI installer boundary
 
-The release zip has a top-level `setup.ps1` entry point. It delegates to
+The release zip has a top-level `setup.cmd` launcher and `setup.ps1` entry point.
+The launcher delegates to PowerShell with a process-scoped execution-policy
+bypass; it does not change the machine or user policy. `setup.ps1` delegates to
 `installer/setup.ps1`, which invokes the reviewed current-user scripts below.
 From an extracted package, review the plan and then install:
 
 ```powershell
-.\setup.ps1 -WhatIf
-.\setup.ps1
+.\setup.cmd -WhatIf
+.\setup.cmd
 ```
 
-Use `.\setup.ps1 -Uninstall -WhatIf` followed by the same command without
-`-WhatIf` to remove the marker-owned installation while preserving Documents
-data. No elevation or machine-wide registry write is used. The package's
+Use `.\setup.cmd -Uninstall -WhatIf` followed by the same command without
+`-WhatIf` to remove the marker-owned installation while preserving product
+data. To invoke the PowerShell script directly, first run
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in that window.
+No elevation or machine-wide registry write is used. The package's
 `assets/icons/redsamurai.ico` is embedded in the executable and also included
 for shell/package inspection.
 
@@ -33,11 +37,17 @@ or elevate the caller.
 The scripts in this directory are the explicit execution boundary:
 
 - `install.ps1` copies the fixed executable name `redsamurai-config.exe`,
-  creates the install and Documents data directories, and registers the stable
+  creates the install and resolved product data directories, and registers the stable
   value `RED SAMURAI 16400DPI Gaming Mouse` with the `--tray` argument.
 - `uninstall.ps1` removes that value and only removes an install directory that
-  contains the install marker written by `install.ps1`. The Documents data
-  directory is always preserved.
+  contains the install marker written by `install.ps1`. The resolved product
+  data directory is always preserved.
+
+The default data location is `Documents\RED SAMURAI 16400DPI Gaming Mouse` when
+the known folder is local. If Documents traverses a cloud reparse point such as
+OneDrive, both install and uninstall deterministically use
+`%LOCALAPPDATA%\OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse`. Explicit
+`-DataDirectory` paths remain fail-closed and must not traverse reparse points.
 
 `install.ps1 -ExecutableName` is retained as an explicit validation boundary,
 but only accepts the default `redsamurai-config.exe`. A custom name could be

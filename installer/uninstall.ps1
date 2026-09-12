@@ -4,8 +4,10 @@
 
 .DESCRIPTION
     Removes only the stable HKCU Run value and a marker-owned install
-    directory.  The Documents\RED SAMURAI 16400DPI Gaming Mouse data
-    directory is preserved deliberately.  Use -WhatIf to review all changes.
+    directory.  The product data directory is preserved deliberately.  The
+    default resolver matches install: local Documents is preferred and a
+    cloud-reparse Documents folder uses %LOCALAPPDATA%\OpenRedSamurai.  Use
+    -WhatIf to review all changes.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(

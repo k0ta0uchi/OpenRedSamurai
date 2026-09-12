@@ -218,6 +218,40 @@ function Assert-NoReparsePointsInPath {
     }
 }
 
+function Test-PathTraversesReparsePoint {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    # The default Documents known folder can be redirected into OneDrive or
+    # another cloud provider.  Keep the installer fail-closed for caller-
+    # supplied paths, but let the default resolver choose a local fallback
+    # when an existing ancestor is a reparse point.
+    $current = $Path
+    while (-not [string]::IsNullOrWhiteSpace($current)) {
+        if (Test-Path -LiteralPath $current) {
+            try {
+                $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+            }
+            catch {
+                throw "Path could not be inspected: $current"
+            }
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                return $true
+            }
+        }
+
+        $parent = [IO.Path]::GetDirectoryName($current)
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -ceq $current) {
+            break
+        }
+        $current = $parent
+    }
+    return $false
+}
+
 function Assert-FileMutationTarget {
     [CmdletBinding()]
     param(
@@ -457,5 +491,17 @@ function Get-DefaultDataDirectory {
         }
         $documents = Join-Path -Path $env:USERPROFILE -ChildPath 'Documents'
     }
-    return Join-Path -Path $documents -ChildPath $ProductName
+    $documentsCandidate = Join-Path -Path $documents -ChildPath $ProductName
+    if (-not (Test-PathTraversesReparsePoint -Path $documentsCandidate)) {
+        return $documentsCandidate
+    }
+
+    # A redirected Documents folder is not a safe mutation boundary.  Keep
+    # the default deterministic for both install and uninstall while placing
+    # new data below the user's local, non-cloud profile tree.
+    if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        throw 'DataDirectory default could not be determined because LOCALAPPDATA is empty.'
+    }
+    $fallbackRoot = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'OpenRedSamurai'
+    return Join-Path -Path $fallbackRoot -ChildPath $ProductName
 }
