@@ -1,0 +1,14 @@
+{
+  "capturePid": 22796,
+  "startedUtc": "2026-09-09T07:25:02.0223813Z",
+  "instance": "USB\\VID_04D9&PID_FC55\\7&1BCDAFD7&0&1",
+  "devicePresentBefore": true,
+  "statusBefore": "OK",
+  "problemBefore": 0,
+  "rebootRequiredBefore": false,
+  "pnputilExit": 3010,
+  "presentAfter": 1,
+  "presentIds": "USB\\VID_04D9&PID_FC55\\7&1BCDAFD7&0&1",
+  "profileBefore": "3ACBF08CF550CBD1EDE29F177A9E383965B66AA22BB82BCA7215634DB4FE14B5",
+  "profileAfter": "3ACBF08CF550CBD1EDE29F177A9E383965B66AA22BB82BCA7215634DB4FE14B5"
+}

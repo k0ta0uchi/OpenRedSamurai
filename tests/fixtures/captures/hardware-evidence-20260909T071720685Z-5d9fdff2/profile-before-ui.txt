@@ -1,0 +1,3 @@
+profilePath=C:\Users\k0ta0\OneDrive\ドキュメント\RED SAMURAI 16400DPI Gaming Mouse\RSProfile1.pfd
+profileBytes=21672
+profileSha256=cfdcededd6f5060cdbc2555588e62027bc36e1904348c7a2eb575aac827ce1ca

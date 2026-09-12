@@ -1,0 +1,35 @@
+# Rust build output
+/target/
+
+# Local hardware captures and generated evidence
+/captures/
+
+# Release staging and archives
+/dist/
+/release/
+*.zip
+*.sha256
+
+# Windows/Rust build artifacts
+*.exe
+*.dll
+*.pdb
+*.dmp
+*.log
+
+# Python/tool caches
+.ruff_cache/
+__pycache__/
+*.py[cod]
+
+# IDE/OS files
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# Local screenshots (the runtime embeds assets/ only)
+/asset_sheet.png
+/ui_smoke.png
+/ui_midnight_linear.png
