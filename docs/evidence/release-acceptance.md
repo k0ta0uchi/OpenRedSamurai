@@ -70,7 +70,7 @@ summary SHA-256 is
 `82AF95452A3F3896D2081B98DB535ACE2CA04A8C6D4CB9CD83D72842B45980A8`.
 The external compatibility manifest was updated with the final binary, audit,
 installer fallback audit, and package values (SHA-256
-`AA1F35DB76637062AC9572F7DF808C9D84BB061F71FA3498062989ABF5056B64`).
+`532CF298F66A516D3B7BD8F47C428EA917EF16B0A8BF75D631C146DDCB7445B2`).
 
 The installer fallback audit at
 `C:\Workspace\OpenRedSamurai\captures\installer-fallback-audit-20260912-131509\result.json`
@@ -79,3 +79,9 @@ is PASS (SHA-256
 ran `setup.cmd -WhatIf`, direct `setup.ps1` with a process-scoped bypass, and
 uninstall WhatIf against the OneDrive-redirected Documents environment; all
 three resolved the same local AppData fallback and returned exit code 0.
+
+The public v1.0.0 asset was downloaded again at
+`C:\Workspace\OpenRedSamurai\captures\release-download-verify-20260912-131840\result.json`
+and passed SHA-256 sidecar, `AllSigned` parent plus `setup.cmd`, and direct
+PowerShell bypass checks (result SHA-256
+`0CF884FEACC6CA1E680ED931156F18F3B887C15BB75DFD2365C89B0431E7FBC5`).

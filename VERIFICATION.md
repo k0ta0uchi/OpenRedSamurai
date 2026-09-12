@@ -77,7 +77,7 @@ The implementation scope and acceptance boundary are summarized in
 [`../captures/official-compatibility-acceptance-20260912.md`](../captures/official-compatibility-acceptance-20260912.md).
 The same decision and artifact hashes are bundled in the machine-readable
 [`../captures/official-compatibility-manifest-20260912.json`](../captures/official-compatibility-manifest-20260912.json)
-(SHA-256 `AA1F35DB76637062AC9572F7DF808C9D84BB061F71FA3498062989ABF5056B64`).
+(SHA-256 `532CF298F66A516D3B7BD8F47C428EA917EF16B0A8BF75D631C146DDCB7445B2`).
 
 The same release also passed the read-only UI Automation smoke on 2026-09-12:
 [`ui-smoke-official-compatible-20260912-022943/result.json`](../captures/ui-smoke-official-compatible-20260912-022943/result.json)
