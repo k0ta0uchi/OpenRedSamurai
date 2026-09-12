@@ -64,7 +64,7 @@ The final package produced from this tree is:
 | `target/release/redsamurai-config.exe` | `3DF3A14A62A05757BEEB8D6EDDAC749A2B66F052CED6920A24F837588D0CC12B` |
 | `target/release/examples/live_probe.exe` | `DA019C2DFA2E397A68B5784FBF71EE08FF6BFB5CCC027AE51C651BD25542E00C` |
 | `assets/icons/redsamurai.ico` | `D3BED40A1D12889D106AF06B6E9FFE9B6A47B93C7CF50A8EEA53280A01F68F5B` |
-| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `86DF98AA6B1496917F59F30F6941C7409DC95A73FD304E334FDC3A2DC137145D` |
+| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `190502B6F83207354B0E5AF0AB37BF20A1DF90BFCC28ADD860488499E4F58ACF` |
 
 The same values are recorded in the zip's `release-manifest.json`, the SHA-256
 sidecar, and the GitHub release notes.
@@ -77,7 +77,7 @@ summary SHA-256 is
 `82AF95452A3F3896D2081B98DB535ACE2CA04A8C6D4CB9CD83D72842B45980A8`.
 The external compatibility manifest was updated with the final binary, audit,
 installer fallback audit, and package values (SHA-256
-`21038A5E16E55B3421A2C349405E975F5F48EB7672D59976F1E3577E24486E37`). It also
+`6F3C71BC33F3AB838B62B41619CA58C2FE87B839B8A53012B3060BD6B904B8EE`). It also
 records the compact-layout screenshot at
 `C:\Workspace\OpenRedSamurai\captures\ui-compact-20260912-final.png`
 (SHA-256 `D52B2934FA200D88DB5753CCC640CA60B1D466B827D4D4AAD5428B42E4D606CF`).
