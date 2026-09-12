@@ -107,4 +107,6 @@ The compact release evidence summary is tracked at
 
 ## License
 
-OpenRedSamurai is released under the [MIT License](LICENSE).
+The original OpenRedSamurai source is released under the [MIT License](LICENSE).
+Bundled visual and compatibility resources may have separate upstream rights;
+see [`NOTICE.md`](NOTICE.md) before redistributing modified resource files.

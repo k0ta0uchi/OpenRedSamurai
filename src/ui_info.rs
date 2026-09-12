@@ -11,10 +11,10 @@ const DETAILS: [(&str, &str); 7] = [
     ("バージョン", "V1.0.0"),
     ("プロダクト", "RED SAMURAI 16400DPI Gaming Mouse"),
     ("モデル番号", "HKW-GMMS01-BK/1"),
-    ("コピーライト", "COPYRIGHT (C) 2021 FSC Co., Ltd."),
+    ("コピーライト", "MIT License"),
     ("権利表記", "ALL RIGHT RESERVED"),
-    ("公式サイト", "http://www.e-fsc.jp/index.html"),
-    ("サポート", "mail:support@e-fsc.jp"),
+    ("公式サイト", "https://github.com/k0ta0uchi/OpenRedSamurai"),
+    ("サポート", "k0ta0uchi@gmail.com"),
 ];
 
 pub fn show(app: &mut App, ctx: &egui::Context) {
@@ -23,7 +23,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .fixed_pos(pos2(0.0, 0.0))
         .show(ctx, |ui| {
             let card_rect =
-                Rect::from_center_size(pos2(400.0, geo::CARD_Y + 145.0), vec2(480.0, 290.0));
+                Rect::from_center_size(pos2(400.0, geo::CARD_Y + 150.0), vec2(480.0, 300.0));
             ui_common::paint_card(ui, card_rect, theme::CARBON, theme::GRAPHITE);
 
             // Header identity inside the card
@@ -66,13 +66,25 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     pos2(card_rect.right() - 24.0, y),
                     Align2::RIGHT_TOP,
                     value,
-                    FontId::proportional(12.0),
+                    // Keep the repository URL inside the value column while
+                    // preserving the full, copyable destination in the UI.
+                    FontId::proportional(if i == 5 { 10.0 } else { 12.0 }),
                     theme::PAPER,
                 );
             }
 
+            // Separate the action from the detail rows so the support line is
+            // not visually attached to the update control.
+            let action_separator_y = card_rect.bottom() - 43.0;
+            ui.painter().line_segment(
+                [
+                    pos2(card_rect.left() + 24.0, action_separator_y),
+                    pos2(card_rect.right() - 24.0, action_separator_y),
+                ],
+                egui::Stroke::new(0.5, theme::GRAPHITE),
+            );
             let update_rect = Rect::from_min_size(
-                pos2(card_rect.left() + 24.0, card_rect.bottom() - 34.0),
+                pos2(card_rect.left() + 24.0, card_rect.bottom() - 32.0),
                 vec2(166.0, 26.0),
             );
             let response = ui_common::linear_button(

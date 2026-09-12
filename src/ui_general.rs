@@ -47,6 +47,7 @@ const SLIDERS: [(&str, &str, i32, i32, f32, bool); 4] = [
 /// value for the reviewed 125 Hz sequence, but the other values remain
 /// evidence-only at the device boundary.
 const POLLING: [(&str, i32); 4] = [("125HZ", 8), ("250HZ", 4), ("500HZ", 2), ("1000HZ", 1)];
+const POLLING_PITCH: f32 = 46.0;
 
 #[cfg(test)]
 mod tests {
@@ -347,7 +348,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             ui.painter().text(
                 pos2(geo::SLIDER_X + 6.0, geo::CARD_Y + 225.0),
                 Align2::LEFT_TOP,
-                "ポーリングレート",
+                "ポーリングレート (Hz)",
                 FontId::proportional(11.0),
                 theme::MIST,
             );
@@ -357,8 +358,11 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 let resp = ui_common::linear_checkbox(
                     ui,
                     &format!("poll_{k}"),
-                    pos2(geo::SLIDER_X + 6.0 + k as f32 * 50.0, geo::CARD_Y + 247.0),
-                    hz,
+                    pos2(
+                        geo::SLIDER_X + 6.0 + k as f32 * POLLING_PITCH,
+                        geo::CARD_Y + 247.0,
+                    ),
+                    hz.trim_end_matches("HZ"),
                     &mut on,
                 );
                 if resp.clicked() && on {

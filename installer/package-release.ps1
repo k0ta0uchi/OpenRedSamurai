@@ -61,6 +61,7 @@ $files = @(
     @{ Source = (Join-Path $repoRoot 'README.md'); Relative = 'README.md' },
     @{ Source = (Join-Path $repoRoot 'README.ja.md'); Relative = 'README.ja.md' },
     @{ Source = (Join-Path $repoRoot 'LICENSE'); Relative = 'LICENSE' },
+    @{ Source = (Join-Path $repoRoot 'NOTICE.md'); Relative = 'NOTICE.md' },
     @{ Source = (Join-Path $repoRoot 'VERSION'); Relative = 'VERSION' },
     @{ Source = (Join-Path $repoRoot 'assets\icons\redsamurai.ico'); Relative = 'assets\icons\redsamurai.ico' },
     @{ Source = (Join-Path $repoRoot 'installer\install.ps1'); Relative = 'installer\install.ps1' },

@@ -10,7 +10,7 @@ use redsamurai_config::installer::{
     INSTALLER_EXECUTABLE_NAME,
 };
 
-const WINDOW_SIZE: [f32; 2] = [560.0, 430.0];
+const WINDOW_SIZE: [f32; 2] = [560.0, 390.0];
 
 enum TaskMessage {
     Checked(Result<ReleaseInfo, UpdateError>),

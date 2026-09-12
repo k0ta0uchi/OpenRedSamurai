@@ -48,6 +48,11 @@ HKCU用の型付きインストール計画、ネイティブRustインストー
 active全キーボードrelay、未検証P2 wire mappingは`DEFERRED-BY-DESIGN`であり、製品完了を
 ブロックしません。
 
+このプロジェクトのオリジナルソースコードは [MIT License](LICENSE) で公開しています。
+配布に含まれる画像・互換用リソースには上流の権利が別に存在する場合があります。
+再配布や改変を行う前に [NOTICE.md](NOTICE.md) を確認してください。MIT表記だけで
+第三者素材の権利が移転することはありません。
+
 現行releaseのSIDE 7 native keyboard pass-through実機確認は
 `../captures/native-keyboard-pass-through-20260912-113532/result.json` に保存しており、
 raw/native・hardwareの押下/解放各1件、Rust注入0件、foreground clipboard完全一致、

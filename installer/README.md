@@ -37,6 +37,9 @@ check:
 
 The package's `assets/icons/redsamurai.ico` is embedded in both native
 executables and also included for shell/package inspection.
+The MIT license covers the original project source; bundled visual and
+compatibility resources can have separate upstream terms. See the packaged
+`NOTICE.md` before redistributing resource files.
 
 Maintainers can build the release archive from the repository root with:
 

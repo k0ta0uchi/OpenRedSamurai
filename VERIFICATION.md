@@ -23,9 +23,9 @@ one user-mode action path for software-only assignments. The relay's
 opt-ins and are not a release requirement.
 
 The current v1.0.0 release build is `target/release/redsamurai-config.exe`
-(SHA-256 `6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62`)
+(SHA-256 `096BBE1083145A549EBAF6F80757139D5ABF520DFDCED76071F89CEC57009523`)
 and `target/release/examples/live_probe.exe` (SHA-256
-`D42E6AB1D3DE79EC5F1C6558AE83B23C56FDEEB84FD992D0EFEB24DC5A365826`).
+`9839AAF6A1924EC0746A9F92F3125D39DBFC60D379E1D5640DDC892FD636E3CA`).
 
 ## Official-compatible user-mode decision — 2026-09-12
 
