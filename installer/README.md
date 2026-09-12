@@ -1,23 +1,42 @@
 # RED SAMURAI installer boundary
 
-The release zip has a top-level `setup.cmd` launcher and `setup.ps1` entry point.
-The launcher delegates to PowerShell with a process-scoped execution-policy
-bypass; it does not change the machine or user policy. `setup.ps1` delegates to
-`installer/setup.ps1`, which invokes the reviewed current-user scripts below.
-From an extracted package, review the plan and then install:
+The release zip's primary entry point is the native `OpenRedSamurai-Setup.exe`.
+Run it from the extracted directory and choose **インストール**. It performs a
+current-user install without a batch file, PowerShell execution-policy change,
+elevation, or machine-wide registry write. The same EXE opens the update GUI
+with `--update` and the uninstall flow with `--uninstall`:
+
+```powershell
+.\OpenRedSamurai-Setup.exe
+.\OpenRedSamurai-Setup.exe --update
+.\OpenRedSamurai-Setup.exe --uninstall
+```
+
+The installed editor's 情報 tab has **更新を確認**, which launches the updater
+beside the installed executable. The updater queries the GitHub Releases API,
+accepts only the repository's matching `OpenRedSamurai-vX.Y.Z-windows-x64.zip`
+and `.sha256` assets, verifies the downloaded bytes, rejects unsafe ZIP paths,
+and then installs the staged payload. When the updater itself is the installed
+executable, it copies a short-lived helper to the staging directory, closes the
+GUI, and retries the replacement until the editor/tray process is closed. Close
+the running editor/tray process before selecting the final update action so the
+application image can be replaced.
+For a private repository, provide a short-lived read-only token through
+`OPENREDSAMURAI_GITHUB_TOKEN` (or `GH_TOKEN`) in the launching user's
+environment; the native updater uses it in memory and never stores it.
+
+The legacy `setup.cmd`, `setup.ps1`, and `installer/*.ps1` scripts remain in the
+package for audit and controlled automation. They use the same HKCU/data
+boundaries and are not required for a normal install. For a review-only legacy
+check:
 
 ```powershell
 .\setup.cmd -WhatIf
-.\setup.cmd
+.\setup.cmd -Uninstall -WhatIf
 ```
 
-Use `.\setup.cmd -Uninstall -WhatIf` followed by the same command without
-`-WhatIf` to remove the marker-owned installation while preserving product
-data. To invoke the PowerShell script directly, first run
-`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` in that window.
-No elevation or machine-wide registry write is used. The package's
-`assets/icons/redsamurai.ico` is embedded in the executable and also included
-for shell/package inspection.
+The package's `assets/icons/redsamurai.ico` is embedded in both native
+executables and also included for shell/package inspection.
 
 Maintainers can build the release archive from the repository root with:
 
@@ -34,7 +53,16 @@ quoted per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 command. It does not open the registry, create directories, launch a process,
 or elevate the caller.
 
-The scripts in this directory are the explicit execution boundary:
+The native module in `src/installer.rs` is the production execution boundary:
+
+- `OpenRedSamurai-Setup.exe` copies the fixed application and installer names,
+  creates the install and resolved product data directories, writes a marker
+  and `VERSION`, and registers the stable per-user `--tray` command.
+- Its release updater downloads only from the configured GitHub repository and
+  checks the SHA-256 sidecar before extraction; ZIP entries are bounded and
+  path-contained.
+
+The scripts in this directory are the legacy/audit execution boundary:
 
 - `install.ps1` copies the fixed executable name `redsamurai-config.exe`,
   creates the install and resolved product data directories, and registers the stable

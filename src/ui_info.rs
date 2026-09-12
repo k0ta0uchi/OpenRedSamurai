@@ -2,7 +2,7 @@
 //! Restyled per Linear Design System (DESIGN.md): Midnight precision instrument.
 
 use crate::app::App;
-use crate::ui_common::{self, geo, theme};
+use crate::ui_common::{self, geo, theme, ButtonKind};
 
 use egui::{pos2, vec2, Align2, FontId, Rect};
 
@@ -17,10 +17,10 @@ const DETAILS: [(&str, &str); 7] = [
     ("サポート", "mail:support@e-fsc.jp"),
 ];
 
-pub fn show(_app: &mut App, ctx: &egui::Context) {
+pub fn show(app: &mut App, ctx: &egui::Context) {
+    let mut update_clicked = false;
     egui::Area::new(egui::Id::new("info_tab"))
         .fixed_pos(pos2(0.0, 0.0))
-        .interactable(false)
         .show(ctx, |ui| {
             let card_rect =
                 Rect::from_center_size(pos2(400.0, geo::CARD_Y + 145.0), vec2(480.0, 290.0));
@@ -57,13 +57,37 @@ pub fn show(_app: &mut App, ctx: &egui::Context) {
                     theme::ASH,
                 );
 
+                let value = if i == 0 {
+                    format!("V{}", crate::installer::CURRENT_VERSION)
+                } else {
+                    (*val).to_owned()
+                };
                 ui.painter().text(
                     pos2(card_rect.right() - 24.0, y),
                     Align2::RIGHT_TOP,
-                    *val,
+                    value,
                     FontId::proportional(12.0),
                     theme::PAPER,
                 );
             }
+
+            let update_rect = Rect::from_min_size(
+                pos2(card_rect.left() + 24.0, card_rect.bottom() - 34.0),
+                vec2(166.0, 26.0),
+            );
+            let response = ui_common::linear_button(
+                ui,
+                "info.update",
+                update_rect,
+                "更新を確認",
+                ButtonKind::Ghost,
+            );
+            update_clicked = response.clicked();
         });
+    if update_clicked {
+        match crate::installer::launch_installer(&["--update"]) {
+            Ok(()) => app.toast(ctx, "更新確認画面を開きました"),
+            Err(error) => app.toast(ctx, format!("更新画面を開けません: {error}")),
+        }
+    }
 }

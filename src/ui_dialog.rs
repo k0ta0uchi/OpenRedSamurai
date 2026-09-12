@@ -127,6 +127,10 @@ fn show_key_dialog(app: &mut App, ctx: &Context) -> Option<DialogResult> {
         // The backdrop lives on the middle layer; keep the dialog above it so
         // the modal itself remains fully legible.
         .order(egui::Order::Foreground)
+        // A modal should be readable on its first frame. The default egui
+        // fade-in also fades the dialog contents, making the backdrop appear
+        // to cover the dialog while it is opening.
+        .fade_in(false)
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
@@ -288,6 +292,8 @@ fn show_fire_dialog(app: &mut App, ctx: &Context) -> Option<DialogResult> {
     Window::new("fire_modal")
         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
         .order(egui::Order::Foreground)
+        // Keep the dialog at full opacity while the background is dimmed.
+        .fade_in(false)
         .collapsible(false)
         .resizable(false)
         .title_bar(false)

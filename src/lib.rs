@@ -19,6 +19,7 @@ pub mod device_protocol;
 pub mod device_runtime;
 pub mod funcs;
 pub mod ini;
+pub mod installer;
 pub mod keyboard_relay;
 pub mod keyboard_relay_windows;
 pub mod keyboard_suppression;

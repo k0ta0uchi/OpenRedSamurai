@@ -34,7 +34,7 @@ The final release run repeats these commands from the repository root:
 .\installer\package-release.ps1 -Version 1.0.0 -SkipBuild
 ```
 
-The release test suite contains 297 tests. The workstation evidence bundle is
+The release test suite contains 303 tests. The workstation evidence bundle is
 the machine-readable final record; its raw paths and hashes are retained in the
 local compatibility manifest and acceptance bundle. The release package adds a
 second, independently computed SHA-256 sidecar and `release-manifest.json`.
@@ -43,49 +43,61 @@ second, independently computed SHA-256 sidecar and `release-manifest.json`.
 
 - `redsamurai-config.exe` is built from this source and contains the multi-size
   `assets/icons/redsamurai.ico` Windows resource.
+- `OpenRedSamurai-Setup.exe` is a native Windows GUI installer built from
+  `src/bin/installer.rs`. It performs current-user install/update/uninstall,
+  registers the quoted `--tray` command under HKCU, and verifies GitHub release
+  ZIP downloads with their SHA-256 sidecar before extraction.
 - The editor uses a shared compact geometry: the main cards start at y=145,
   the profile row is separated from the cards, and the footer actions share a
   single baseline with 10px gaps. Active profile labels reserve a text column
   beside the status dot.
 - Modal backdrops remain on the middle layer while dialog windows are placed on
-  the foreground layer, so the dialog contents stay readable. The tray icon
-  is decoded from the embedded `assets/icons/redsamurai.png` logo.
-- `setup.cmd`/`setup.ps1` install through `HKCU` only, require no elevation, and
-  preserve the resolved product data directory during uninstall. A redirected
-  OneDrive Documents folder automatically uses the local AppData fallback.
+  the foreground layer. Dialog fade-in is disabled so the modal body and its
+  controls stay fully readable from the first visible frame. The tray icon is
+  decoded from the embedded `assets/icons/redsamurai.png` logo.
+- The legacy `setup.cmd`/`setup.ps1` path and the native installer both install
+  through `HKCU` only, require no elevation, and preserve the resolved product
+  data directory during uninstall. A redirected OneDrive Documents folder
+  automatically uses the local AppData fallback.
 - `README.md` and `README.ja.md` describe the same v1.0.0 scope and deferred
   boundaries.
-- `installer/package-release.ps1` produces the Windows x64 zip and hash sidecar.
+- `installer/package-release.ps1` produces the Windows x64 zip, sidecar, and
+  manifest entries for both the editor and native installer.
 
 The final package produced from this tree is:
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `target/release/redsamurai-config.exe` | `3DF3A14A62A05757BEEB8D6EDDAC749A2B66F052CED6920A24F837588D0CC12B` |
-| `target/release/examples/live_probe.exe` | `DA019C2DFA2E397A68B5784FBF71EE08FF6BFB5CCC027AE51C651BD25542E00C` |
+| `target/release/redsamurai-config.exe` | `6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62` |
+| `target/release/OpenRedSamurai-Setup.exe` | `332CC662A7E85F08D6F9ADC026122BAFC4782FD39165627F8298042A7F10441F` |
+| `target/release/examples/live_probe.exe` | `D42E6AB1D3DE79EC5F1C6558AE83B23C56FDEEB84FD992D0EFEB24DC5A365826` |
 | `assets/icons/redsamurai.ico` | `D3BED40A1D12889D106AF06B6E9FFE9B6A47B93C7CF50A8EEA53280A01F68F5B` |
-| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `190502B6F83207354B0E5AF0AB37BF20A1DF90BFCC28ADD860488499E4F58ACF` |
+| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip` | `776B72E742C8924EA19E921A830464511A2A784BA218863B7493AA82FAD3EF1A` |
+| `dist/OpenRedSamurai-v1.0.0-windows-x64.zip.sha256` | `8DA846DD3BEE1324E780E2160A970D67BDA7D3F1FEDCD1F589BB5D9E9754F04D` |
 
 The same values are recorded in the zip's `release-manifest.json`, the SHA-256
 sidecar, and the GitHub release notes.
 
-The final static audit was generated at
-`C:\Workspace\OpenRedSamurai\captures\release-static-audit-20260912-125149`.
-Its result is PASS with SHA-256
-`3D019C08F0951A2F6E62078D3F4C31DE02FFFA7E1C6C10EBC18CBF27783236D2`, and its
-summary SHA-256 is
-`82AF95452A3F3896D2081B98DB535ACE2CA04A8C6D4CB9CD83D72842B45980A8`.
-The external compatibility manifest was updated with the final binary, audit,
-installer fallback audit, and package values (SHA-256
-`6F3C71BC33F3AB838B62B41619CA58C2FE87B839B8A53012B3060BD6B904B8EE`). It also
-records the compact-layout screenshot at
-`C:\Workspace\OpenRedSamurai\captures\ui-compact-20260912-final.png`
-(SHA-256 `D52B2934FA200D88DB5753CCC640CA60B1D466B827D4D4AAD5428B42E4D606CF`).
-
 The final source tree test run is recorded at
-`C:\Workspace\OpenRedSamurai\captures\release-test-ui-20260912-135106\result.json`
-with 297 passing tests (result SHA-256
-`9744A8931B52D942843879C2FDE73372D4C310B95258761DC17172AAB7277E39`).
+`C:\Workspace\OpenRedSamurai\redsamurai-config\captures\full-test-20260912-150044\cargo-test.log`
+with 303 passing tests and zero failures (log SHA-256
+`D0B88D0B0E3ED38218A910ABE8E50B82810CDE49C4DA62A5EE455BCA5BC7CC53`).
+The latest static audit is
+`C:\Workspace\OpenRedSamurai\captures\release-static-audit-20260912-150723\result.json`
+with status `pass`, result SHA-256
+`0ED38C5F3FDE93B37426D9F97293268D8971A83F2685E4908F0EAEA9B5D4EA9A`, summary
+SHA-256 `C17B5CC1583AC941BB4B2107DFE63A4F430A5712ED5E26031FD048E8E1773B3E`,
+and zero tracked processes after the audit.
+The final UI accessibility smoke passed with 36/34/74/20 nodes and the
+installer update identifier; its editor executable SHA-256 is
+`6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62`.
+The modal readability capture is
+`C:\Workspace\OpenRedSamurai\redsamurai-config\captures\modal-readability-20260912.png`
+(SHA-256 `F867DB5B9C5C40B37AF4B4435DB927BE7EAFB9DB3241A61E3842C6B1567F0CEF`);
+the dialog body is fully bright while only the background backdrop is dimmed.
+The native installer Japanese-font capture is
+`C:\Workspace\OpenRedSamurai\redsamurai-config\captures\installer-japanese-20260912.png`
+(SHA-256 `F111F8BFB96F7F7DFA1689B6581386033AC306097CE60737EACCFCDA333A7F8C`).
 
 The installer fallback audit at
 `C:\Workspace\OpenRedSamurai\captures\installer-fallback-audit-20260912-131509\result.json`
@@ -95,8 +107,8 @@ ran `setup.cmd -WhatIf`, direct `setup.ps1` with a process-scoped bypass, and
 uninstall WhatIf against the OneDrive-redirected Documents environment; all
 three resolved the same local AppData fallback and returned exit code 0.
 
-The public v1.0.0 asset was downloaded again at
-`C:\Workspace\OpenRedSamurai\captures\release-download-verify-20260912-131840\result.json`
-and passed SHA-256 sidecar, `AllSigned` parent plus `setup.cmd`, and direct
-PowerShell bypass checks (result SHA-256
-`0CF884FEACC6CA1E680ED931156F18F3B887C15BB75DFD2365C89B0431E7FBC5`).
+The native updater GUI was smoke-tested against the private GitHub repository
+with a short-lived `gh auth token`: it displayed the current release and no
+404/error state. The token is read only from the launching environment and is
+never written to disk. The package manifest and sidecar above were generated
+after the final release build.

@@ -4,11 +4,14 @@
 [ROADMAP.md](ROADMAP.md) / [VERIFICATION.md](VERIFICATION.md) を参照してください。
 
 現在の配布版は **v1.0.0** です。GitHub Releases の Windows x64 zip に含まれる
-`setup.cmd` を、展開したフォルダーから実行すると、現在のユーザーだけに
-インストールできます（管理者権限不要）。`setup.cmd` はプロセス限定で
-PowerShell の実行ポリシーを bypass するため、システムのポリシーは変更しません。
-`.\setup.ps1` を直接実行する場合は、同じPowerShellで
-`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` を先に実行してください。
+`OpenRedSamurai-Setup.exe` を展開したフォルダーから起動すると、現在のユーザーだけに
+インストールできます（管理者権限不要）。ネイティブGUIなので、PowerShellの実行ポリシー
+変更やバッチファイルは必要ありません。アプリの「情報」タブにある「更新を確認」からも
+同じ更新GUIを開けます。更新はGitHub Releasesの一致したzipだけを取得し、SHA-256 sidecar
+を検証してから置き換えます。
+
+インストール先の更新GUI自身を更新する場合は、一時ヘルパーへ処理を引き継いでGUIを閉じ、
+エディターとトレイを終了できるまで再試行してから新しいファイルを適用します。
 
 Windowsの「ドキュメント」がOneDriveなどの再解析ポイントへリダイレクトされている場合、
 安全検査を維持するため、データは自動的に
@@ -25,7 +28,7 @@ RED SAMURAI 16400DPI Gaming Mouse (VID_04D9/PID_FC55) 用の設定ツール — 
 
 **Phase 3/4 (実装済み)**: `MI_01` の9バイト入力を読む常駐ランタイム、デバウンス付き
 ソフトウェア割付・マクロ再生、Windows `SendInput` 境界、通知領域トレイ、`--tray` 自動起動、
-HKCU用の型付きインストール計画とレビュー可能な PowerShell インストーラ
+HKCU用の型付きインストール計画、ネイティブRustインストーラーGUI、GitHub更新確認
 
 製品の受入基準は、専用カーネルドライバーではなく純正ソフトのユーザーモード方式を
 再現することです。対象デバイスはWindows標準の`usbccgp`/`HidUsb`/`kbdhid`/`mouhid`
@@ -38,7 +41,7 @@ HKCU用の型付きインストール計画とレビュー可能な PowerShell �
 生のPCAP・ログ・互換性マニフェストは検証ワークステーション側のcapturesに保管し、
 リポジトリへは取り込みません。
 
-製品スコープ内の受入ゲートは **17/17、100%** です。現行release SHA、295テスト、
+製品スコープ内の受入ゲートは **17/17、100%** です。現行release SHA、303テスト、
 静的監査、実機入力・切断復旧、UI smoke、使い捨てmacro/combo、tray/logonを束ねた
 最終判定は [docs/evidence/release-acceptance.md](docs/evidence/release-acceptance.md)
 に要約しています。Report-03完全readback、kernel filter、
@@ -72,6 +75,7 @@ MSVC 環境が必要です。同梱の `msvc_cargo.bat` (vcvars64 設定込み) 
 
 ```powershell
 .\msvc_cargo.bat build                        # ビルド
+.\msvc_cargo.bat build --release --bin OpenRedSamurai-Setup # インストーラーEXE
 .\msvc_cargo.bat test                         # 全テスト
 .\target\debug\redsamurai-config.exe          # 起動
 ```
@@ -91,6 +95,10 @@ MSVC 環境が必要です。同梱の `msvc_cargo.bat` (vcvars64 設定込み) 
 開かず、切断からの再接続時だけ、プロファイルから作れる認可済みの完全156-report列を
 Rust自身が再適用します。未検証フィールドは送信せず、再適用できない場合も入力監視は
 継続します。
+
+ネイティブインストーラーは `target\release\OpenRedSamurai-Setup.exe` として生成されます。
+配布zipではこのEXEを起動してインストールし、情報タブの「更新を確認」からGitHub
+Releasesの最新版を確認できます。PowerShell版は監査・互換用に残しています。
 
 ```powershell
 .\target\debug\redsamurai-config.exe --tray
@@ -212,7 +220,7 @@ ID を検査する読み取り専用スモークです。PowerShell で `.\verif
 ## 検証済み項目
 
 - `msvc_cargo.bat test` で Phase 1/1.5 の互換テストと Phase 2 境界テストを実行
-- 現在の静的スイートは全295テスト（失敗0）
+- 現在の静的スイートは全303テスト（失敗0）
 - **実ファイル byte-exact ラウンドトリップ**: 実際の
   `ドキュメント\RED SAMURAI 16400DPI Gaming Mouse\RSProfile1.pfd` を読んで保存すると
   バイト単位で同一 (`real_file_roundtrip_is_byte_exact`)
@@ -235,7 +243,7 @@ ID を検査する読み取り専用スモークです。PowerShell で `.\verif
 | `src/resident_platform.rs` | `MI_01` の厳密な列挙/解析、Windows SendInput | Phase3 |
 | `src/resident_service.rs` | 常駐入力ループとProfile/マクロの組み合わせ | Phase3 |
 | `src/tray.rs` | `--tray` 起動、通知領域メニュー、設定画面起動 | Phase4 |
-| `src/phase4.rs` / `installer/` | HKCU Run、絶対パス検証、install/uninstall計画と実行スクリプト | Phase4 |
+| `src/phase4.rs` / `src/installer.rs` / `installer/` | HKCU Run、絶対パス検証、ネイティブGUIのinstall/update/uninstall、監査用スクリプト | Phase4 |
 
 実装は Orca orchestration (run_b5acdbb88301) により 4 pi ワーカーで並列実行した。
 各ワーカーの契約は `CONTRACT_*.md` に定義。

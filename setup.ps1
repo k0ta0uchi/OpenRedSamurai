@@ -3,8 +3,9 @@
     Installs or removes the packaged OpenRedSamurai current-user application.
 
 .DESCRIPTION
-    This is the single entry point shipped in the release zip. It delegates to
-    the reviewed scripts under installer/ and never requests elevation.
+    Legacy compatibility entry point shipped alongside the native
+    OpenRedSamurai-Setup.exe. It delegates to the reviewed scripts under
+    installer/ and never requests elevation.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(

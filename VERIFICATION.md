@@ -22,6 +22,11 @@ one user-mode action path for software-only assignments. The relay's
 `RIDEV_NOLEGACY` registration and self-injection marker remain diagnostic
 opt-ins and are not a release requirement.
 
+The current v1.0.0 release build is `target/release/redsamurai-config.exe`
+(SHA-256 `6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62`)
+and `target/release/examples/live_probe.exe` (SHA-256
+`D42E6AB1D3DE79EC5F1C6558AE83B23C56FDEEB84FD992D0EFEB24DC5A365826`).
+
 ## Official-compatible user-mode decision — 2026-09-12
 
 The acceptance criterion is reproduction of the installed vendor method. The

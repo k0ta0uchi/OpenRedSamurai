@@ -105,6 +105,7 @@ if ($null -eq $window) {
     Invoke-UiId 'red-samurai.tab_3'
     $info = @(Get-UiNodes)
     Assert-HasId $info 'red-samurai.tab_3'
+    Assert-HasId $info 'red-samurai.info.update'
 
     Invoke-UiId 'red-samurai.tab_0'
     $restored = @(Get-UiNodes)
@@ -134,6 +135,7 @@ if ($null -eq $window) {
             'red-samurai.slider_MouseSensitivity'
             'red-samurai.dpi_vslider_0'
             'red-samurai.light.custom-color'
+            'red-samurai.info.update'
             'red-samurai.bottom_6'
         )
     } | ConvertTo-Json -Depth 4

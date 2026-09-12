@@ -29,6 +29,11 @@
 ユーザーモードaction、使い捨てマクロ／コンボ、トレイ契約を製品スコープとして受入れ、
 診断relayと未検証プロトコルだけを延期した。
 
+最終v1.0.0バイナリは `target/release/redsamurai-config.exe`
+(SHA-256 `6B81C67A1B0BFFDAC75F11C6D08B147D981DBC82D310D30A9FEBEF83FAF6CA62`) と、
+`target/release/examples/live_probe.exe` (SHA-256
+`D42E6AB1D3DE79EC5F1C6558AE83B23C56FDEEB84FD992D0EFEB24DC5A365826`) である。
+
 ### 2026-09-12 公式互換方式を受入基準に採用
 
 製品の受入基準を、専用カーネルドライバーではなく、インストール済み純正ソフトと

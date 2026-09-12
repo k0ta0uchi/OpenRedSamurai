@@ -24,7 +24,9 @@ The release includes:
   UI accessibility identifiers;
 - a multi-size `redsamurai.ico` embedded in the executable and shipped with the
   installer package;
-- 295 automated tests plus the release static audit and hardware acceptance bundle.
+- a native `OpenRedSamurai-Setup.exe` installer with current-user setup and
+  GitHub Releases update checks;
+- 303 automated tests plus the release static audit and hardware acceptance bundle.
 
 The supported runtime uses the standard Windows `usbccgp`/`HidUsb`/`kbdhid`/`mouhid`
 stack. No kernel filter, test-signed driver, or official `hid.exe` process is needed.
@@ -38,27 +40,30 @@ not guessed or silently enabled.
 1. Download `OpenRedSamurai-v1.0.0-windows-x64.zip` from the
    [v1.0.0 GitHub release](https://github.com/k0ta0uchi/OpenRedSamurai/releases/tag/v1.0.0).
 2. Extract it to a directory you control.
-3. In that directory, review and run:
+3. In that directory, run `OpenRedSamurai-Setup.exe` and press **インストール**.
+   The installer is a native GUI executable. It uses HKCU only, requires no
+   elevation or PowerShell execution-policy change, copies the application and
+   updater into `%LOCALAPPDATA%\RED SAMURAI`, registers current-user tray
+   startup, and keeps profile data outside the install tree.
+4. To update after a new version is published, open the installed
+   `OpenRedSamurai-Setup.exe` (or use **更新を確認** in the application's 情報
+   tab), then choose **最新版を確認** and **ダウンロードして更新**. The
+   updater accepts only the matching GitHub repository asset and verifies its
+   SHA-256 sidecar before replacing files.
 
-   ```powershell
-   Set-Location 'C:\Path\to\OpenRedSamurai-v1.0.0-windows-x64'
-   .\setup.cmd -WhatIf
-   .\setup.cmd
-   ```
+   Public releases need no credentials. If the repository is private, set a
+   read-only `OPENREDSAMURAI_GITHUB_TOKEN` (or `GH_TOKEN`) for the launching
+   user; the native updater sends it only for the GitHub request and does not
+   save it.
 
-   `setup.cmd` starts PowerShell with a process-scoped execution-policy bypass;
-   it does not change the machine or user policy. If you invoke the script
-   directly, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
-   in that PowerShell window first. The installer copies `redsamurai-config.exe`
-   to the current user's LocalAppData, creates the product data directory under
-   Documents when that folder is local, and automatically uses
-   `%LOCALAPPDATA%\OpenRedSamurai\RED SAMURAI 16400DPI Gaming Mouse` when
-   Documents is redirected through a cloud reparse point. You can override the
-   path with `-DataDirectory` when invoking `installer/install.ps1` directly.
-   It registers one quoted `--tray` command under
-   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. It does not elevate
-   or write machine-wide state. To remove the installation while preserving user
-   data, run `.\setup.cmd -Uninstall -WhatIf` and then repeat without `-WhatIf`.
+   If the updater is running from the installed directory, it hands the staged
+   payload to a short-lived helper before replacing its own executable. Close
+   the editor/tray process when prompted so the helper can finish the update.
+
+The legacy PowerShell entry points remain in the package for audit and controlled
+automation. Existing installations may still review `.\setup.cmd -WhatIf`.
+To remove an installation from the native GUI, run
+`OpenRedSamurai-Setup.exe --uninstall` and press **アンインストール**.
 
 The packaged `installer/` directory contains the individual reviewed scripts for
 auditing or controlled automation. Close the tray process before uninstalling.
@@ -73,6 +78,7 @@ Set-Location .\redsamurai-config
 .\msvc_cargo.bat check --all-targets --no-default-features
 .\msvc_cargo.bat test --all -- --test-threads=1
 .\msvc_cargo.bat build --release
+.\msvc_cargo.bat build --release --bin OpenRedSamurai-Setup
 ```
 
 The release package can be produced with:
