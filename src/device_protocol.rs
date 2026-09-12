@@ -5,8 +5,8 @@
 //! use.  The controlled USBPcap2 trace also contains one `03/F3/20` report
 //! whose buffer is exactly 64 bytes; the disassembly-backed `04/F3/C8` block
 //! remains a separate 0x400-byte observation.  This module deliberately stops at the
-//! wire schema: it does not open HID devices.  The one sequence token below is
-//! only a complete, evidence-backed Apply authorization; it is not a general
+//! wire schema: it does not open HID devices.  The sequence token below is a
+//! complete, evidence-backed Apply authorization; it is not a general
 //! profile-to-command mapping.  Every standalone command whose parameter
 //! meaning has not been verified is therefore exposed as `Unsupported`.
 
@@ -182,12 +182,23 @@ pub const APPLY_DPI_SELECTION_FRAME_INDEX: usize = 16;
 pub const DPI_SELECTION_APPLY_OBSERVED_OFFSET: usize = 8;
 /// Profile values covered by the controlled selected-DPI A/B capture.
 pub const AUTHORIZED_DPI_SELECTION_PROFILE_VALUES: &[i32] = &[1, 2];
+/// Zero-based report index of the observed `02/F3/49` LED mode/color report.
+pub const APPLY_LIGHT_MODE_FRAME_INDEX: usize = 3;
+/// Profile value used by the UI for the rainbow LED mode.
+pub const APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW: i32 = 2;
+/// The two mode bytes observed when the official GUI applies レインボー.
+/// The surrounding color and state bytes remain part of the complete
+/// evidence-backed sequence.
+pub const APPLY_LIGHT_MODE_RAINBOW_WIRE_PAIR: [u8; 2] = [0x03, 0x05];
 /// Evidence reference for the selected-DPI sequence/readback promotion.
 pub const DPI_SELECTION_EVIDENCE: &str =
     "captures/dpi-reconnect-readback-comparison-20260911.md: Run A/B Apply -> reconnect -> readback";
 /// Evidence reference for the sequence token.
 pub const APPLY_SEQUENCE_EVIDENCE: &str =
     "captures/hardware-evidence-20260909T071720685Z-5d9fdff2/evidence-report.md: Official 125Hz Apply";
+/// Evidence reference for the official GUI rainbow Apply capture.
+pub const LIGHT_MODE_RAINBOW_EVIDENCE: &str =
+    "captures/official-light-rainbow-interactive-20260912-223739/root2.pcap: complete Apply with レインボー selected";
 
 /// The unresolved report-05 observation was `(04, 01, 00)` after the
 /// report id.  Its field meaning is intentionally not interpreted.
@@ -715,6 +726,9 @@ pub enum ApplySequenceError {
     /// The selected-DPI value is outside the two values covered by the
     /// controlled reconnect/readback A/B capture.
     UnsupportedDpiSelection { actual: i32 },
+    /// The only LED mode promoted by the official GUI capture is rainbow
+    /// (`LedMode1=2`).
+    UnsupportedLedMode { actual: i32 },
 }
 
 impl fmt::Display for ApplySequenceError {
@@ -743,6 +757,10 @@ impl fmt::Display for ApplySequenceError {
             Self::UnsupportedDpiSelection { actual } => write!(
                 f,
                 "unsupported DPI profile value {actual}; the reviewed reconnect/readback mapping covers values 1 and 2"
+            ),
+            Self::UnsupportedLedMode { actual } => write!(
+                f,
+                "unsupported LED mode profile value {actual}; the reviewed GUI Apply mapping covers rainbow value 2"
             ),
         }
     }
@@ -938,6 +956,7 @@ impl ReportFrame {
 pub struct VerifiedApplySequence {
     frames: Vec<ReportFrame>,
     dpi_selection_profile_value: Option<i32>,
+    led_mode_profile_value: Option<i32>,
 }
 
 impl VerifiedApplySequence {
@@ -962,6 +981,33 @@ impl VerifiedApplySequence {
         Ok(Self {
             frames: canonical_apply_frames(APPLY_POLLING_RATE_WIRE_VALUE_125_HZ),
             dpi_selection_profile_value: None,
+            led_mode_profile_value: None,
+        })
+    }
+
+    /// Build the reviewed complete sequence for the official GUI's rainbow
+    /// LED mode.  The capture authorizes the complete ordered burst with the
+    /// `02/F3/49` mode bytes `03 05`; no standalone mode report is emitted.
+    pub fn for_profile_polling_rate_and_led_mode(
+        profile_polling_rate: i32,
+        profile_led_mode: i32,
+    ) -> Result<Self, ApplySequenceError> {
+        if profile_polling_rate != APPLY_POLLING_RATE_PROFILE_VALUE_125_HZ {
+            return Err(ApplySequenceError::UnsupportedPollingRate {
+                actual: profile_polling_rate,
+                expected: APPLY_POLLING_RATE_PROFILE_VALUE_125_HZ,
+            });
+        }
+        if profile_led_mode != APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW {
+            return Err(ApplySequenceError::UnsupportedLedMode {
+                actual: profile_led_mode,
+            });
+        }
+
+        Ok(Self {
+            frames: canonical_apply_frames(APPLY_POLLING_RATE_WIRE_VALUE_125_HZ),
+            dpi_selection_profile_value: None,
+            led_mode_profile_value: Some(profile_led_mode),
         })
     }
 
@@ -994,7 +1040,26 @@ impl VerifiedApplySequence {
                 Some(wire_value),
             ),
             dpi_selection_profile_value: Some(profile_dpi_selection),
+            led_mode_profile_value: None,
         })
+    }
+
+    /// Build the reviewed complete sequence with both an A/B-proven selected
+    /// DPI value and the official GUI rainbow LED mode.
+    pub fn for_profile_polling_rate_and_dpi_and_led_mode(
+        profile_polling_rate: i32,
+        profile_dpi_selection: i32,
+        profile_led_mode: i32,
+    ) -> Result<Self, ApplySequenceError> {
+        if profile_led_mode != APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW {
+            return Err(ApplySequenceError::UnsupportedLedMode {
+                actual: profile_led_mode,
+            });
+        }
+        let mut sequence =
+            Self::for_profile_polling_rate_and_dpi(profile_polling_rate, profile_dpi_selection)?;
+        sequence.led_mode_profile_value = Some(profile_led_mode);
+        Ok(sequence)
     }
 
     /// Alias using the shorter field name used by the profile model.
@@ -1048,6 +1113,7 @@ impl VerifiedApplySequence {
                 return Ok(Self {
                     frames: frames.to_vec(),
                     dpi_selection_profile_value: profile_dpi_selection,
+                    led_mode_profile_value: None,
                 });
             }
         }
@@ -1093,6 +1159,7 @@ impl VerifiedApplySequence {
         Ok(Self {
             frames: frames.to_vec(),
             dpi_selection_profile_value: None,
+            led_mode_profile_value: None,
         })
     }
 
@@ -1173,6 +1240,12 @@ impl VerifiedApplySequence {
         self.dpi_selection_profile_value
     }
 
+    /// Return the promoted profile LED mode when this token was built for the
+    /// official GUI rainbow mapping.
+    pub const fn profile_led_mode(&self) -> Option<i32> {
+        self.led_mode_profile_value
+    }
+
     /// Return the selected-DPI wire byte when this token carries one of the
     /// promoted A/B-proven substitutions.
     pub const fn dpi_selection_wire_value(&self) -> Option<u8> {
@@ -1184,9 +1257,13 @@ impl VerifiedApplySequence {
 
     /// Return the evidence reference for this token.
     pub const fn evidence(&self) -> &'static str {
-        match self.dpi_selection_profile_value {
-            Some(_) => DPI_SELECTION_EVIDENCE,
-            None => APPLY_SEQUENCE_EVIDENCE,
+        if self.led_mode_profile_value.is_some() {
+            LIGHT_MODE_RAINBOW_EVIDENCE
+        } else {
+            match self.dpi_selection_profile_value {
+                Some(_) => DPI_SELECTION_EVIDENCE,
+                None => APPLY_SEQUENCE_EVIDENCE,
+            }
         }
     }
 

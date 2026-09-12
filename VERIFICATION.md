@@ -22,8 +22,8 @@ one user-mode action path for software-only assignments. The relay's
 `RIDEV_NOLEGACY` registration and self-injection marker remain diagnostic
 opt-ins and are not a release requirement.
 
-The current v1.0.0 release build is `target/release/redsamurai-config.exe`
-(SHA-256 `096BBE1083145A549EBAF6F80757139D5ABF520DFDCED76071F89CEC57009523`)
+The current v1.0.1 release build is `target/release/redsamurai-config.exe`
+(SHA-256 `88BAEA05054A82E72A81A12CD766C5BDD4A6DF24038A1D39822A8C2814B37A98`)
 and `target/release/examples/live_probe.exe` (SHA-256
 `9839AAF6A1924EC0746A9F92F3125D39DBFC60D379E1D5640DDC892FD636E3CA`).
 
@@ -111,12 +111,12 @@ usages, the alias, and their release pairing. The bounded live gate for the
 factory single-key path is now PASS; software-only action exactly-once remains
 a separate gate.
 
-The rebuilt release used for the next live gate is
+The rebuilt v1.0.1 release used for the next live gate is
 `target/release/redsamurai-config.exe` (SHA-256
-`6557F26013404C565271E366E6EA4476DA81BEA6B685BE40C1021BD701DB2F6C`); the
+`88BAEA05054A82E72A81A12CD766C5BDD4A6DF24038A1D39822A8C2814B37A98`); the
 matching probe is
 `target/release/examples/live_probe.exe` (SHA-256
-`DA019C2DFA2E397A68B5784FBF71EE08FF6BFB5CCC027AE51C651BD25542E00C`).
+`9839AAF6A1924EC0746A9F92F3125D39DBFC60D379E1D5640DDC892FD636E3CA`).
 
 The bounded operator harness for this gate is
 `../captures/native-keyboard-pass-through-audit.ps1 -ConfirmLive`. It starts

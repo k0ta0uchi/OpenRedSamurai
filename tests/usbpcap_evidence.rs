@@ -12,6 +12,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use redsamurai_config::device_apply::{ApplyError, ApplyPlan};
+use redsamurai_config::device_protocol::{
+    APPLY_LIGHT_MODE_FRAME_INDEX, APPLY_SEQUENCE_FRAME_COUNT,
+};
 use redsamurai_config::profile::Profile;
 
 const TARGET_VID_PID_DESCRIPTOR: [u8; 12] = [
@@ -65,6 +68,10 @@ const UI_APPLY_TRACE_BYTES: usize = 4_020_271;
 const UI_APPLY_TRACE_RECORDS: usize = 38_323;
 const UI_APPLY_TARGET_PACKETS: usize = 318;
 const UI_APPLY_SET_REPORTS: usize = 156;
+const LIGHT_RAINBOW_FIXTURE: &str = "official-light-rainbow-20260912/root2.pcap";
+const LIGHT_RAINBOW_BYTES: usize = 2_203_209;
+const LIGHT_RAINBOW_SHA256: &str =
+    "142cc8292b91c95653bbfc7fce9a01dc9069c2411a35f3fb5ca4d14f2702cfd3";
 const PROFILE_EVIDENCE_DIR: &str = "rs-observation-20260909T061712713Z-af8fbf35";
 const PROFILE_BEFORE: &str = "RSProfile1.pfd.pre-action.bak";
 const PROFILE_AFTER: &str = "RSProfile1.pfd.after-apply.copy";
@@ -2644,6 +2651,37 @@ fn post_restart_ui_apply_capture_has_one_exact_write_burst_without_readback() {
             .collect::<Vec<_>>(),
     );
     assert_ui_apply_profile_is_unchanged();
+}
+
+#[test]
+fn official_gui_rainbow_apply_is_a_complete_ordered_burst() {
+    let path = capture_path(LIGHT_RAINBOW_FIXTURE);
+    let bytes = read_capture_bytes(&path);
+    assert_eq!(bytes.len(), LIGHT_RAINBOW_BYTES);
+    assert_eq!(sha256_hex(&bytes), LIGHT_RAINBOW_SHA256);
+
+    let packets = parse_pcap(&bytes, &path);
+    assert_exact_capture_lengths(&packets);
+    let target = target_address(&packets);
+    let reports = set_report_payloads(&packets, target);
+    let starts: Vec<usize> = reports
+        .iter()
+        .enumerate()
+        .filter_map(|(index, report)| {
+            (report == &hex_report("02f50000000000000000000000000000")).then_some(index)
+        })
+        .collect();
+    assert_eq!(
+        starts.len(),
+        1,
+        "the rainbow capture must contain one full Apply"
+    );
+    let burst = &reports[starts[0]..starts[0] + APPLY_SEQUENCE_FRAME_COUNT];
+    assert_burst_shape(burst);
+    assert_eq!(
+        burst[APPLY_LIGHT_MODE_FRAME_INDEX],
+        hex_report("02f3490406000000ff00000305010000")
+    );
 }
 
 #[test]

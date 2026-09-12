@@ -187,7 +187,7 @@ impl App {
     ///
     /// The plan is always prepared first.  Unsupported fields remain visible
     /// as warnings and are excluded from I/O; a complete reviewed sequence
-    /// may still be applied for the known PollingRate/DPI subset.  An
+    /// may still be applied for the known PollingRate/DPI/rainbow subset. An
     /// unavailable device retains the same plan as a dry-run result.
     /// Consequently this method is the sole app-level path that can perform
     /// device I/O, and it is only called by the explicit Apply action in the
@@ -208,7 +208,7 @@ impl App {
 
         // The profile may contain fields whose device mapping is still
         // unverified.  Keep those warnings visible, but isolate the complete
-        // reviewed sequence so the known PollingRate/DPI portion can still be
+        // reviewed sequence so the known PollingRate/DPI/rainbow portion can still be
         // used without the vendor process.  No warning-bearing raw frame is
         // ever sent.
         let write_plan = if let Some(sequence) = plan.verified_sequence().cloned() {

@@ -998,6 +998,21 @@ pub fn linear_hslider(
 }
 
 /// Linear Precision Vertical Slider (for DPI tab).
+fn wheel_step_from_scroll(scroll_y: f32) -> i32 {
+    if !scroll_y.is_finite() || scroll_y == 0.0 {
+        0
+    } else {
+        // egui reports a wheel-up/content-up event as a positive delta.
+        // Increase the value by one device step, matching numeric spinner
+        // behavior; wheel down therefore decreases it.
+        if scroll_y > 0.0 {
+            1
+        } else {
+            -1
+        }
+    }
+}
+
 pub fn linear_vslider(
     ui: &egui::Ui,
     id: &str,
@@ -1019,6 +1034,27 @@ pub fn linear_vslider(
             let v = max - (span as f32 * t).round() as i32; // Top is max
             if v != value {
                 new_value = Some(v);
+            }
+        }
+    }
+
+    // Keep the wheel on the slider local to this stage.  Ignore modified
+    // scrolling so Ctrl/Shift wheel retains its platform/egui meaning.  One
+    // wheel event always moves exactly one code, i.e. 100 DPI in the stage
+    // display, regardless of the backend's line-vs-point delta magnitude.
+    if active && response.hovered() {
+        let scroll_y = ui.input(|input| {
+            if input.modifiers.is_none() {
+                input.raw_scroll_delta.y
+            } else {
+                0.0
+            }
+        });
+        let wheel_step = wheel_step_from_scroll(scroll_y);
+        if wheel_step != 0 {
+            let wheel_value = value.saturating_add(wheel_step).clamp(min, max);
+            if wheel_value != value {
+                new_value = Some(wheel_value);
             }
         }
     }
@@ -1062,7 +1098,7 @@ pub fn linear_vslider(
 
 #[cfg(test)]
 mod tests {
-    use super::{a11y, geo};
+    use super::{a11y, geo, wheel_step_from_scroll};
 
     #[test]
     fn accessibility_ids_are_namespaced_and_stable() {
@@ -1086,6 +1122,15 @@ mod tests {
             a11y::name("red-samurai.titlebar.close", ""),
             "red-samurai.titlebar.close [a11y-id: red-samurai.titlebar.close]"
         );
+    }
+
+    #[test]
+    fn vertical_slider_wheel_direction_is_one_step_per_event() {
+        assert_eq!(wheel_step_from_scroll(50.0), 1);
+        assert_eq!(wheel_step_from_scroll(-50.0), -1);
+        assert_eq!(wheel_step_from_scroll(1.0), 1);
+        assert_eq!(wheel_step_from_scroll(0.0), 0);
+        assert_eq!(wheel_step_from_scroll(f32::NAN), 0);
     }
 
     #[test]

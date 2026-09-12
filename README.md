@@ -7,7 +7,7 @@ reviewed boundary.
 
 [日本語 README](README.ja.md) · [Roadmap](ROADMAP.md) · [Verification ledger](VERIFICATION.md)
 
-## v1.0.0 scope
+## v1.0.1 scope
 
 The official-compatible product scope is complete: **17/17 acceptance gates (100%)**.
 The release includes:
@@ -22,11 +22,13 @@ The release includes:
 - software button actions through the Windows `SendInput` and Core Audio boundaries;
 - macro recording/playback, combo assignment, microphone mute, DPI controls, and
   UI accessibility identifiers;
+- DPI stage sliders support one 100-DPI wheel step per notch and click-to-edit
+  numeric values rounded to the nearest 100 DPI (100–16,400 DPI);
 - a multi-size `redsamurai.ico` embedded in the executable and shipped with the
   installer package;
 - a native `OpenRedSamurai-Setup.exe` installer with current-user setup and
   GitHub Releases update checks;
-- 303 automated tests plus the release static audit and hardware acceptance bundle.
+- 308 automated tests plus the release static audit and hardware acceptance bundle.
 
 The supported runtime uses the standard Windows `usbccgp`/`HidUsb`/`kbdhid`/`mouhid`
 stack. No kernel filter, test-signed driver, or official `hid.exe` process is needed.
@@ -37,8 +39,8 @@ not guessed or silently enabled.
 
 ## Install the release
 
-1. Download `OpenRedSamurai-v1.0.0-windows-x64.zip` from the
-   [v1.0.0 GitHub release](https://github.com/k0ta0uchi/OpenRedSamurai/releases/tag/v1.0.0).
+1. Download `OpenRedSamurai-v1.0.1-windows-x64.zip` from the
+   [v1.0.1 GitHub release](https://github.com/k0ta0uchi/OpenRedSamurai/releases/tag/v1.0.1).
 2. Extract it to a directory you control.
 3. In that directory, run `OpenRedSamurai-Setup.exe` and press **インストール**.
    The installer is a native GUI executable. It uses HKCU only, requires no
@@ -84,7 +86,7 @@ Set-Location .\redsamurai-config
 The release package can be produced with:
 
 ```powershell
-.\installer\package-release.ps1 -Version 1.0.0
+.\installer\package-release.ps1 -Version 1.0.1
 ```
 
 The script writes the zip, SHA-256 sidecar, and a machine-readable manifest to

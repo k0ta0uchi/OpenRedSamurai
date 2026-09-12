@@ -2,7 +2,10 @@
 //! Restyled per Linear Design System (DESIGN.md): Midnight precision instrument.
 
 use crate::app::App;
-use crate::profile::{dpi_code_to_display, DpiStage};
+use crate::profile::{
+    dpi_code_to_display, dpi_display_to_code, DpiStage, DPI_DISPLAY_MAX, DPI_DISPLAY_MIN,
+    DPI_DISPLAY_STEP,
+};
 use crate::ui_common::{self, geo, theme};
 
 use egui::{pos2, vec2, Align2, FontId, Rect, Sense};
@@ -182,15 +185,46 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     ));
                 }
 
-                // DPI Value display at bottom
-                let disp = dpi_code_to_display(st.code);
-                ui.painter().text(
-                    pos2(card_rect.center().x, card_rect.bottom() - 36.0),
-                    Align2::CENTER_TOP,
-                    format!("{disp}"),
-                    FontId::proportional(15.0),
-                    if st.enabled { theme::PAPER } else { theme::ASH },
+                // DPI value editor at the bottom.  DragValue keeps the
+                // familiar click-to-edit behavior, commits on Enter/focus
+                // loss, and rounds direct input to the nearest 100 DPI.
+                let value_rect = Rect::from_min_size(
+                    pos2(card_rect.left() + 8.0, card_rect.bottom() - 48.0),
+                    vec2(col_w - 16.0, 26.0),
                 );
+                let mut display_dpi = dpi_code_to_display(st.code) as i32;
+                let value_resp = ui.put(
+                    value_rect,
+                    egui::DragValue::new(&mut display_dpi)
+                        .range(DPI_DISPLAY_MIN as i32..=DPI_DISPLAY_MAX as i32)
+                        .speed(DPI_DISPLAY_STEP as f64)
+                        .fixed_decimals(0)
+                        .update_while_editing(false)
+                        .custom_parser(|text| {
+                            let parsed = text.trim().replace(',', "").parse::<i64>().ok()?;
+                            let clamped =
+                                parsed.clamp(DPI_DISPLAY_MIN as i64, DPI_DISPLAY_MAX as i64) as u32;
+                            Some(dpi_code_to_display(dpi_display_to_code(clamped)) as f64)
+                        })
+                        .custom_formatter(|value, _| format!("{}", value.round() as i32)),
+                );
+                ui_common::a11y::spinbox(
+                    &value_resp,
+                    &format!("dpi.value.{i}"),
+                    display_dpi as f64,
+                );
+                if value_resp.changed() {
+                    let code = dpi_display_to_code(
+                        display_dpi.clamp(DPI_DISPLAY_MIN as i32, DPI_DISPLAY_MAX as i32) as u32,
+                    );
+                    stage_set = Some((
+                        i,
+                        DpiStage {
+                            enabled: st.enabled,
+                            code,
+                        },
+                    ));
+                }
                 ui.painter().text(
                     pos2(card_rect.center().x, card_rect.bottom() - 18.0),
                     Align2::CENTER_TOP,

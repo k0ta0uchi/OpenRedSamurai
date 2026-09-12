@@ -44,7 +44,7 @@ included. See the packaged `NOTICE.md` for the asset boundary.
 Maintainers can build the release archive from the repository root with:
 
 ```powershell
-.\installer\package-release.ps1 -Version 1.0.0
+.\installer\package-release.ps1 -Version 1.0.1
 ```
 
 The command creates a Windows x64 zip, a SHA-256 sidecar, and a release

@@ -57,7 +57,8 @@ pub fn draw_profile_row(app: &mut App, ctx: &egui::Context); // プロファイ�
 pub fn draw_bottom_row(app: &mut App, ctx: &egui::Context);
 // 保存=save-as dialog(rfd) → writes .pfd; ロードファイル=open dialog → import into current slot
 // (rename GROUP* sections to current slot naming); 既定=reset current to defaults;
-// すべてリセット=reset all 5; 適用=save current slot file + toast "保存しました(デバイス適用はPhase2)";
+// すべてリセット=reset all 5; 適用=save current slot file and send only the
+// evidence-gated complete Apply sequence (including verified rainbow mode);
 // OK=適用+Close; キャンセル=reload all from disk+Close. Disabled look for nothing; all active.
 pub fn draw_toast(app: &mut App, ctx: &egui::Context);      // status toast, hide after ~2.5s
 ```text
@@ -73,12 +74,14 @@ pub fn draw_toast(app: &mut App, ctx: &egui::Context);      // status toast, hid
   polling radio boxes 125/250/500/1000HZ → PollingRate {1,2,4,8}, double-click test spiral
   (clicks within 500ms set result "OK" else "速すぎ/遅い" text under the spiral).
 - `ui_dpi.rs`: 5 columns (geo.DPI_COL_X): dpi label texture at y200 (checked=enabled from
-  `dpi_stages()`), "+" above track, vslider (code 0..=163) with thumb, value label
-  `(code+1)*100` below track y460; left LED column at x105: 5 radio textures, radio_on marks
+  `dpi_stages()`), "+" above track, vslider (code 0..=163) with thumb, wheel over a slider
+  changes one code (100 DPI), and the value below the track is a click-to-edit numeric field
+  rounded to the nearest 100 DPI; left LED column at x105: 5 radio textures, radio_on marks
   `current_dpi_stage()`.
 - `ui_light.rs`: mouse_color image, ライトカラー palette 8x5 cells 19x19 gap4 at (330,228):
-  HSV rows [reds..yellows, greens, cyans, blues, magentas] + last cell rainbow (activates
-  LedMode stub toast), click sets LedColor1 (COLORREF); カスタムライトカラー combo at (330,395)
+  HSV rows [reds..yellows, greens, cyans, blues, magentas] + last cell rainbow (sets
+  `LedMode1=2`, backed by the official complete Apply capture), click sets LedColor1 (COLORREF);
+  カスタムライトカラー combo at (330,395)
   170x20 shows current color bar (egui color picker button is fine); 明度レベル radios
   オフ/低/中/高 → LedState1 0..3; 呼吸スピード 2-col radios 低/中/高/フルライト → BreathState1
   {2,5,7,0}; LEDモードスイッチ rows [フラッシュ,オフ],[虹,フルライト],[呼吸,波] → LedMode1 0..5.

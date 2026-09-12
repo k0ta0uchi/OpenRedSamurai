@@ -1,6 +1,6 @@
 [package]
 name = "redsamurai-config"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "RED SAMURAI 16400DPI Gaming Mouse configuration and resident tray tool"
 license = "MIT"

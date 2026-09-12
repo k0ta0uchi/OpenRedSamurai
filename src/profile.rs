@@ -620,14 +620,32 @@ impl Profile {
     }
 }
 
+/// Smallest display DPI accepted by the stage editor.
+pub const DPI_DISPLAY_MIN: u32 = 100;
+/// Largest display DPI accepted by the stage editor and device table.
+pub const DPI_DISPLAY_MAX: u32 = 16_400;
+/// Direct-entry and wheel granularity for display DPI.
+pub const DPI_DISPLAY_STEP: u32 = 100;
+
 /// Display DPI for a stored code: `(code+1)*100` clamped to 100..=16400.
 pub fn dpi_code_to_display(code: u32) -> u32 {
-    (code.saturating_add(1).saturating_mul(100)).clamp(100, 16400)
+    (code.saturating_add(1).saturating_mul(DPI_DISPLAY_STEP))
+        .clamp(DPI_DISPLAY_MIN, DPI_DISPLAY_MAX)
 }
 
-/// Stored code for a display DPI: `(d/100)-1` clamped to 0..=163.
+/// Stored code for a display DPI.
+///
+/// Values entered between device steps are rounded to the nearest 100 DPI,
+/// with an exact midpoint rounded upward, then clamped to 100..=16400.
 pub fn dpi_display_to_code(display: u32) -> u32 {
-    (display / 100).saturating_sub(1).min(163)
+    let clamped = display.clamp(DPI_DISPLAY_MIN, DPI_DISPLAY_MAX);
+    let rounded = clamped
+        .saturating_add(DPI_DISPLAY_STEP / 2)
+        .checked_div(DPI_DISPLAY_STEP)
+        .unwrap_or(0)
+        .saturating_mul(DPI_DISPLAY_STEP)
+        .min(DPI_DISPLAY_MAX);
+    rounded / DPI_DISPLAY_STEP - 1
 }
 
 #[cfg(test)]
@@ -649,6 +667,12 @@ mod tests {
         assert_eq!(dpi_code_to_display(0), 100);
         assert_eq!(dpi_code_to_display(u32::MAX), 16400);
         assert_eq!(dpi_display_to_code(0), 0);
+        // Direct numeric entry uses the nearest 100-DPI step (half-up),
+        // matching the stage values exposed by the device UI.
+        assert_eq!(dpi_display_to_code(149), 0);
+        assert_eq!(dpi_display_to_code(150), 1);
+        assert_eq!(dpi_display_to_code(151), 1);
+        assert_eq!(dpi_display_to_code(16_449), 163);
         assert_eq!(dpi_display_to_code(999_999_999), 163);
     }
 

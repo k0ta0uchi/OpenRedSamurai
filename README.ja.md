@@ -3,7 +3,7 @@
 英語版は [README.md](README.md) です。リリース手順と検証台帳は
 [ROADMAP.md](ROADMAP.md) / [VERIFICATION.md](VERIFICATION.md) を参照してください。
 
-現在の配布版は **v1.0.0** です。GitHub Releases の Windows x64 zip に含まれる
+現在の配布版は **v1.0.1** です。GitHub Releases の Windows x64 zip に含まれる
 `OpenRedSamurai-Setup.exe` を展開したフォルダーから起動すると、現在のユーザーだけに
 インストールできます（管理者権限不要）。ネイティブGUIなので、PowerShellの実行ポリシー
 変更やバッチファイルは必要ありません。アプリの「情報」タブにある「更新を確認」からも
@@ -30,6 +30,10 @@ RED SAMURAI 16400DPI Gaming Mouse (VID_04D9/PID_FC55) 用の設定ツール — 
 ソフトウェア割付・マクロ再生、Windows `SendInput` 境界、通知領域トレイ、`--tray` 自動起動、
 HKCU用の型付きインストール計画、ネイティブRustインストーラーGUI、GitHub更新確認
 
+DPIタブの各ステージは、スライダー上のホイール1ノッチで100 DPIずつ移動できます。
+表示値をクリックして直接入力することもでき、値は最近傍100 DPI（中央値は切り上げ）へ丸め、
+100〜16,400 DPIの範囲に収めます。
+
 製品の受入基準は、専用カーネルドライバーではなく純正ソフトのユーザーモード方式を
 再現することです。対象デバイスはWindows標準の`usbccgp`/`HidUsb`/`kbdhid`/`mouhid`
 スタックで動作し、設定はhidapiのfeature report、ソフトウェア割付はユーザーモードの
@@ -41,7 +45,7 @@ HKCU用の型付きインストール計画、ネイティブRustインストー
 生のPCAP・ログ・互換性マニフェストは検証ワークステーション側のcapturesに保管し、
 リポジトリへは取り込みません。
 
-製品スコープ内の受入ゲートは **17/17、100%** です。現行release SHA、303テスト、
+製品スコープ内の受入ゲートは **17/17、100%** です。現行release SHA、308テスト、
 静的監査、実機入力・切断復旧、UI smoke、使い捨てmacro/combo、tray/logonを束ねた
 最終判定は [docs/evidence/release-acceptance.md](docs/evidence/release-acceptance.md)
 に要約しています。Report-03完全readback、kernel filter、
@@ -225,7 +229,7 @@ ID を検査する読み取り専用スモークです。PowerShell で `.\verif
 ## 検証済み項目
 
 - `msvc_cargo.bat test` で Phase 1/1.5 の互換テストと Phase 2 境界テストを実行
-- 現在の静的スイートは全303テスト（失敗0）
+- 現在の静的スイートは全308テスト（失敗0）
 - **実ファイル byte-exact ラウンドトリップ**: 実際の
   `ドキュメント\RED SAMURAI 16400DPI Gaming Mouse\RSProfile1.pfd` を読んで保存すると
   バイト単位で同一 (`real_file_roundtrip_is_byte_exact`)
@@ -267,7 +271,8 @@ ID を検査する読み取り専用スモークです。PowerShell で `.\verif
 - 逆アセンブルで観測できた command のうち、単独の profile field write として
   検証済みのものはありません。PollingRate、DPI table/current stage、LED mode
   /breath、ButtonFunc の未確定 sub-function (48/49/52/53) などは ApplyPlan の
-  warning になり、推測した単独書き込みを生成しません。例外として、実機の
+  warning になり、推測した単独書き込みを生成しません。例外として、公式GUIの
+  レインボー（`LedMode1=2`）は完全Apply列で対応を固定しています。さらに実機の
   125 Hz Applyで取得した **156件の完全な順序列**だけが、profile値 `8` に対する
   `VerifiedApplySequence` として認可されます。この完全列に限り、再接続後の
   A/B readbackで対応が一致した選択 `DPI=1/2` を、`02/F3/42` の16番目の
@@ -338,8 +343,8 @@ Rustのトレイworkerは、入力の列挙・Raw Input監視・デバウンス�
   が `82→84` になった。いずれもUI相関までを固定し、全値への一般化はしていない。
 - 追加キャプチャで現れた `02/F3/44`, `49`, `4F`, `5C`, `8E` は
   `src/device_protocol.rs` の観測済みヘッダ表にも登録したが、全て書き込み不可のままにしている。
-- 未確定マッピング: DPIの全表示値とfield式、LedMode1/BreathState1の数値対応、色値の
-  一意な対応、サブ機能ID (48/49/52/53)、`04/F3/C8`の対象デバイス帰属。
+- 未確定マッピング: DPIの全表示値とfield式、レインボー以外の`LedMode1`、`BreathState1`、
+  色値の一意な対応、サブ機能ID (48/49/52/53)、`04/F3/C8`の対象デバイス帰属。
 
 USBPcap2のハッシュと再現手順はリポジトリ直下の `ANALYSIS.md` §5.1–§5.5 に記載し、
 `tests/usbpcap_evidence.rs`でWiresharkなしにpcapng/classic pcapのヘッダ、インターフェース、

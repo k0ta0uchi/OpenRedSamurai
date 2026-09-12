@@ -4,15 +4,16 @@
 //! wire shape and a status-query pair, but it does not establish a verified
 //! profile-field-to-command mapping.  Consequently a plan records the
 //! observed status query separately, reports every profile value that would
-//! need a mapping, and never invents a setting or commit frame.  A status
-//! query is not part of the write list: keeping it separate prevents an
-//! informational/read-only observation from being sent through the apply
-//! transport by accident.
+//! need a mapping, and never invents a setting or commit frame.  The one
+//! complete Apply sequence is the narrow exception for the captured 125 Hz
+//! profile and official rainbow mode.  A status query is not part of the
+//! write list: keeping it separate prevents an informational/read-only
+//! observation from being sent through the apply transport by accident.
 
 use crate::device_protocol::{
     command_info, ApplySequenceError, CommandCapability, DpiSelectionReadback, FrameError,
-    PollingRateReadback, ReportFrame, VerifiedApplySequence, VerifiedWrite, CMD_F2, PARAM_LEN,
-    REPORT_ID_CONFIG, SUBCMD_F2_STATUS,
+    PollingRateReadback, ReportFrame, VerifiedApplySequence, VerifiedWrite,
+    APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW, CMD_F2, PARAM_LEN, REPORT_ID_CONFIG, SUBCMD_F2_STATUS,
 };
 use crate::profile::Profile;
 use std::error::Error;
@@ -531,8 +532,9 @@ impl ApplyPlan {
     /// report `PollingRate` and unsupported DPI selections as warnings. This
     /// constructor is the only profile-to-write path that asks the protocol
     /// gate for its complete reviewed Apply sequence. A sequence is attached
-    /// only for the authorized PollingRate and (when present) the two
-    /// reconnect/readback-proven DPI selection values.
+    /// only for the authorized PollingRate, the captured rainbow LED mode,
+    /// and (when present) the two reconnect/readback-proven DPI selection
+    /// values.
     pub fn try_build_authorized(profile: &Profile) -> Result<Self, ApplyError> {
         Self::try_build_authorized_with_options(profile, ApplyOptions::default())
     }
@@ -591,6 +593,13 @@ impl ApplyPlan {
             .is_some()
         {
             plan.warnings.retain(|warning| warning.field != "DPI");
+        }
+        if sequence
+            .as_ref()
+            .and_then(VerifiedApplySequence::profile_led_mode)
+            .is_some()
+        {
+            plan.warnings.retain(|warning| warning.field != "LedMode1");
         }
         plan.verified_sequence = sequence;
 
@@ -1176,7 +1185,36 @@ fn authorized_polling_sequence(
     let Some(profile_value) = profile_i32(profile, "PollingRate") else {
         return Ok(None);
     };
-    let sequence = if profile_has_key(profile, "DPI") {
+    let led_mode = profile_has_key(profile, "LedMode1")
+        .then(|| profile_i32(profile, "LedMode1"))
+        .flatten();
+    let sequence = if matches!(led_mode, Some(2)) {
+        if profile_has_key(profile, "DPI") {
+            let Some(dpi) = profile_i32(profile, "DPI") else {
+                return Ok(None);
+            };
+            match dpi {
+                // Zero is the captured baseline in the complete 156-report
+                // sequence.  Keep the selected-DPI field at that baseline
+                // while still applying the independently authorized rainbow
+                // mode.
+                0 => VerifiedApplySequence::for_profile_polling_rate_and_led_mode(
+                    profile_value,
+                    APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+                ),
+                dpi => VerifiedApplySequence::for_profile_polling_rate_and_dpi_and_led_mode(
+                    profile_value,
+                    dpi,
+                    APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+                ),
+            }
+        } else {
+            VerifiedApplySequence::for_profile_polling_rate_and_led_mode(
+                profile_value,
+                APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+            )
+        }
+    } else if profile_has_key(profile, "DPI") {
         let Some(dpi) = profile_i32(profile, "DPI") else {
             return Ok(None);
         };
@@ -1198,27 +1236,52 @@ fn authorized_polling_sequence(
 /// The reconnect path deliberately ignores every profile field whose device
 /// mapping is still unverified.  It accepts only the complete 125 Hz sequence
 /// and, when present, the two A/B-proven selected-DPI values.  The captured
-/// baseline `DPI=0` is also accepted, but it never grants a selected-DPI
-/// mapping: the sequence leaves that byte at its observed baseline.  Any
-/// other unsupported value disables replay instead of silently changing it to
-/// a different DPI.
+/// rainbow mode (`LedMode1=2`) is carried by that same complete sequence. The
+/// captured baseline `DPI=0` is also accepted, but it never grants a
+/// selected-DPI mapping: the sequence leaves that byte at its observed
+/// baseline.  Any other unsupported value disables replay instead of
+/// silently changing it to a different DPI.
 pub fn build_rust_owned_reconnect_sequence(profile: &Profile) -> Option<VerifiedApplySequence> {
     if !profile_has_key(profile, "PollingRate") {
         return None;
     }
 
     let polling_rate = profile_i32(profile, "PollingRate")?;
+    let rainbow = profile_has_key(profile, "LedMode1")
+        && profile_i32(profile, "LedMode1") == Some(APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW);
     if profile_has_key(profile, "DPI") {
         let dpi = profile_i32(profile, "DPI")?;
         match dpi {
+            0 if rainbow => VerifiedApplySequence::for_profile_polling_rate_and_led_mode(
+                polling_rate,
+                APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+            )
+            .ok(),
             0 => VerifiedApplySequence::for_profile_polling_rate(polling_rate).ok(),
             1 | 2 => {
-                VerifiedApplySequence::for_profile_polling_rate_and_dpi(polling_rate, dpi).ok()
+                if rainbow {
+                    VerifiedApplySequence::for_profile_polling_rate_and_dpi_and_led_mode(
+                        polling_rate,
+                        dpi,
+                        APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+                    )
+                    .ok()
+                } else {
+                    VerifiedApplySequence::for_profile_polling_rate_and_dpi(polling_rate, dpi).ok()
+                }
             }
             _ => None,
         }
     } else {
-        VerifiedApplySequence::for_profile_polling_rate(polling_rate).ok()
+        if rainbow {
+            VerifiedApplySequence::for_profile_polling_rate_and_led_mode(
+                polling_rate,
+                APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW,
+            )
+            .ok()
+        } else {
+            VerifiedApplySequence::for_profile_polling_rate(polling_rate).ok()
+        }
     }
 }
 
@@ -1313,7 +1376,7 @@ fn collect_profile_warnings_with_polling(
         ),
         (
             "LedMode1",
-            "LED mode numeric mapping is unconfirmed; no write emitted",
+            "only rainbow value 2 is verified in a complete Apply; other LED modes have no write mapping",
         ),
         (
             "BreathState1",

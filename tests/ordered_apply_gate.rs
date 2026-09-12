@@ -6,10 +6,10 @@
 
 use redsamurai_config::device_apply::{ApplyError, ApplyPlan, VerifiedSequenceTransport};
 use redsamurai_config::device_protocol::{
-    CommandCapability, VerifiedApplySequence, APPLY_DPI_SELECTION_FRAME_INDEX, CMD_F1, CMD_F3,
-    DPI_SELECTION_APPLY_OBSERVED_OFFSET, EXTENDED_REPORT_LEN, PARAMS_OFFSET,
-    POLLING_RATE_OBSERVED_OFFSET, REPORT_ID_CONFIG, REPORT_ID_CONFIG_EXTENDED, REPORT_LEN,
-    SUBCMD_F1_02, SUBCMD_F3_20, SUBCMD_F3_32, SUBCMD_F3_38,
+    CommandCapability, VerifiedApplySequence, APPLY_DPI_SELECTION_FRAME_INDEX,
+    APPLY_LIGHT_MODE_FRAME_INDEX, CMD_F1, CMD_F3, DPI_SELECTION_APPLY_OBSERVED_OFFSET,
+    EXTENDED_REPORT_LEN, PARAMS_OFFSET, POLLING_RATE_OBSERVED_OFFSET, REPORT_ID_CONFIG,
+    REPORT_ID_CONFIG_EXTENDED, REPORT_LEN, SUBCMD_F1_02, SUBCMD_F3_20, SUBCMD_F3_32, SUBCMD_F3_38,
 };
 use redsamurai_config::ini::IniDoc;
 use redsamurai_config::profile::Profile;
@@ -198,6 +198,64 @@ fn authorized_profile_uses_the_proven_dpi_selection_in_its_sequence() {
     let sequence = plan
         .verified_sequence()
         .expect("authorized profile must retain the ordered sequence");
+    assert_eq!(
+        sequence.frames()[APPLY_DPI_SELECTION_FRAME_INDEX]
+            .encode()
+            .expect("DPI selection frame must encode"),
+        hex_bytes("02f34200020000000200000000000000")
+    );
+}
+
+#[test]
+fn rainbow_mode_uses_the_captured_led_mode_pair() {
+    let sequence = VerifiedApplySequence::for_profile_polling_rate_and_led_mode(8, 2)
+        .expect("the captured rainbow mode must build an authorized sequence");
+
+    assert_eq!(sequence.profile_led_mode(), Some(2));
+    assert_eq!(
+        sequence.frames()[APPLY_LIGHT_MODE_FRAME_INDEX]
+            .encode()
+            .expect("rainbow mode frame must encode"),
+        hex_bytes("02f3490406000000ff00000305010000")
+    );
+}
+
+#[test]
+fn authorized_profile_accepts_rainbow_mode_with_the_complete_sequence() {
+    let mut doc = IniDoc::default();
+    doc.set("GROUP0", "PollingRate", "8");
+    doc.set("GROUP0", "LedMode1", "2");
+    let plan = ApplyPlan::try_build_authorized(&Profile { slot: 1, doc })
+        .expect("the captured rainbow profile must build an authorized plan");
+
+    assert!(plan.warnings.is_empty());
+    let sequence = plan
+        .verified_sequence()
+        .expect("rainbow profile must retain the ordered sequence");
+    assert_eq!(sequence.profile_led_mode(), Some(2));
+}
+
+#[test]
+fn authorized_profile_combines_rainbow_mode_with_selected_dpi() {
+    let mut doc = IniDoc::default();
+    doc.set("GROUP0", "PollingRate", "8");
+    doc.set("GROUP0", "DPI", "2");
+    doc.set("GROUP0", "LedMode1", "2");
+    let plan = ApplyPlan::try_build_authorized(&Profile { slot: 1, doc })
+        .expect("the captured rainbow+DPI profile must build an authorized plan");
+
+    assert!(plan.warnings.is_empty());
+    let sequence = plan
+        .verified_sequence()
+        .expect("rainbow+DPI profile must retain the ordered sequence");
+    assert_eq!(sequence.profile_led_mode(), Some(2));
+    assert_eq!(sequence.profile_dpi_selection(), Some(2));
+    assert_eq!(
+        sequence.frames()[APPLY_LIGHT_MODE_FRAME_INDEX]
+            .encode()
+            .expect("rainbow mode frame must encode"),
+        hex_bytes("02f3490406000000ff00000305010000")
+    );
     assert_eq!(
         sequence.frames()[APPLY_DPI_SELECTION_FRAME_INDEX]
             .encode()

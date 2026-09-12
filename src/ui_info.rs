@@ -8,7 +8,7 @@ use egui::{pos2, vec2, Align2, FontId, Rect};
 
 /// (label, value) pairs formatted per Linear specification.
 const DETAILS: [(&str, &str); 7] = [
-    ("バージョン", "V1.0.0"),
+    ("バージョン", "V1.0.1"),
     ("プロダクト", "RED SAMURAI 16400DPI Gaming Mouse"),
     ("モデル番号", "HKW-GMMS01-BK/1"),
     ("コピーライト", "MIT License"),

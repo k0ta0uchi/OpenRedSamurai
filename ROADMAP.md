@@ -29,8 +29,8 @@
 ユーザーモードaction、使い捨てマクロ／コンボ、トレイ契約を製品スコープとして受入れ、
 診断relayと未検証プロトコルだけを延期した。
 
-最終v1.0.0バイナリは `target/release/redsamurai-config.exe`
-(SHA-256 `096BBE1083145A549EBAF6F80757139D5ABF520DFDCED76071F89CEC57009523`) と、
+最終v1.0.1バイナリは `target/release/redsamurai-config.exe`
+(SHA-256 `88BAEA05054A82E72A81A12CD766C5BDD4A6DF24038A1D39822A8C2814B37A98`) と、
 `target/release/examples/live_probe.exe` (SHA-256
 `9839AAF6A1924EC0746A9F92F3125D39DBFC60D379E1D5640DDC892FD636E3CA`) である。
 
@@ -136,11 +136,11 @@ relayの再実機受入れは診断トラックとして必要な場合だけ実
 ### 現在のリリースバイナリ
 
 - `target/release/redsamurai-config.exe` — SHA-256
-  `6557F26013404C565271E366E6EA4476DA81BEA6B685BE40C1021BD701DB2F6C`
+  `88BAEA05054A82E72A81A12CD766C5BDD4A6DF24038A1D39822A8C2814B37A98`
 - `target/release/examples/live_probe.exe` — SHA-256
-  `DA019C2DFA2E397A68B5784FBF71EE08FF6BFB5CCC027AE51C651BD25542E00C`
+  `9839AAF6A1924EC0746A9F92F3125D39DBFC60D379E1D5640DDC892FD636E3CA`
 
-静的リリース監査は`../captures/release-static-audit-20260912-125149/result.json`
+v1.0.0時点の静的リリース監査は`../captures/release-static-audit-20260912-125149/result.json`
 （SHA-256 `3D019C08F0951A2F6E62078D3F4C31DE02FFFA7E1C6C10EBC18CBF27783236D2`）と
 `summary.md`（SHA-256 `82AF95452A3F3896D2081B98DB535ACE2CA04A8C6D4CB9CD83D72842B45980A8A8`）へ
 保存した。`fmt --check`、全ターゲットcheck、全295テスト、release buildの
@@ -489,12 +489,18 @@ PCAPには、再接続後の公式証跡にある `195 SET_REPORT + 193 GET_REPO
 
 - [x] **DEFERRED-BY-DESIGN:** `DPIStageValue`、`DPIStageNum`、`DPICurrentX/Y`の個別A/B取得は
   製品完了条件から除外した。単独Report-03の8バイト応答を40バイトreadbackへ推測昇格しない。
+- [x] DPIタブのstage操作を拡張した。スライダー上のホイールは1回あたり100 DPI、表示値の
+  クリック編集は最近傍100 DPI（150は200）へ丸め、100〜16400 DPIへクランプする。
 - **完了条件:** stage表示値とwire値の式、Apply列の差分位置、再接続後GET、Rust parser/テスト、
   現行バイナリの実機証跡が一致する。再開時は完全Apply列と再接続後GETを同一Runで取得する。
 
 #### MAP-02 — LED / brightness / color
 
-- [x] **DEFERRED-BY-DESIGN:** `LedMode1`、`BreathState1`、`LedColor1`、brightnessの個別mappingは
+- [x] `LedMode1=2`（虹）だけは公式GUIの完全Apply列で検証した。`02/F3/49`のモード組は
+  `03 05`で、完全な156レポート列（155×16B + 1×64B、全status 0）を
+  `tests/fixtures/captures/official-light-rainbow-20260912/root2.pcap`へ固定し、Rustの
+  sequence gateとUIのパレット虹へ接続した。単独`02/F3/49`送信は行わない。
+- [ ] **DEFERRED-BY-DESIGN:** `BreathState1`、`LedColor1`、brightness、虹以外の`LedMode1`は
   製品完了条件から除外した。既存の公式証跡と未検証フィールドを混同しない。
 - **完了条件:** COLORREF変換を含む保存値、wire値、再接続readback、完全列の全件がそろう。
 

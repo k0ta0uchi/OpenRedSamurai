@@ -2,6 +2,7 @@
 //! Restyled per Linear Design System (DESIGN.md): Midnight precision instrument.
 
 use crate::app::App;
+use crate::device_protocol::APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW;
 use crate::ui_common::{self, geo, theme};
 
 use egui::{pos2, vec2, Align2, Color32, FontId, Rect, Sense};
@@ -167,6 +168,13 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         egui::Rounding::same(theme::RADIUS_BADGE),
                         egui::Stroke::new(1.0, theme::GRAPHITE),
                     );
+                    if mode == APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW {
+                        ui.painter().rect_stroke(
+                            r,
+                            egui::Rounding::same(theme::RADIUS_BADGE),
+                            egui::Stroke::new(2.0, theme::PAPER),
+                        );
+                    }
                     let rainbow_resp =
                         ui.interact(r, egui::Id::new("palette_rainbow"), Sense::click());
                     ui_common::a11y::button(&rainbow_resp, "light.palette.rainbow", "虹");
@@ -332,7 +340,10 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         app.current_profile_mut().set_led_color_rgb(c);
     }
     if rainbow {
-        app.toast(ctx, "虹はPhase2");
+        // The official GUI's rainbow Apply is backed by the complete
+        // evidence-gated sequence and is represented by LedMode1=2.
+        app.current_profile_mut()
+            .set_i32("LedMode1", APPLY_LIGHT_MODE_PROFILE_VALUE_RAINBOW);
     }
     if let Some(v) = state_pick {
         app.current_profile_mut().set_i32("LedState1", v);
