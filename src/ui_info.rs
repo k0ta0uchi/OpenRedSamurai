@@ -2,7 +2,7 @@
 //! Restyled per Linear Design System (DESIGN.md): Midnight precision instrument.
 
 use crate::app::App;
-use crate::ui_common::{self, theme};
+use crate::ui_common::{self, geo, theme};
 
 use egui::{pos2, vec2, Align2, FontId, Rect};
 
@@ -22,7 +22,8 @@ pub fn show(_app: &mut App, ctx: &egui::Context) {
         .fixed_pos(pos2(0.0, 0.0))
         .interactable(false)
         .show(ctx, |ui| {
-            let card_rect = Rect::from_center_size(pos2(400.0, 344.0), vec2(480.0, 290.0));
+            let card_rect =
+                Rect::from_center_size(pos2(400.0, geo::CARD_Y + 145.0), vec2(480.0, 290.0));
             ui_common::paint_card(ui, card_rect, theme::CARBON, theme::GRAPHITE);
 
             // Header identity inside the card

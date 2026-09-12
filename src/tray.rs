@@ -195,7 +195,7 @@ pub fn run_tray_mode() -> Result<(), TrayError> {
     let exit_item = MenuItem::with_id(EXIT_ID, "終了", true, None);
     let menu = Menu::with_items(&[&open_item, &exit_item])
         .map_err(|error| TrayError::Native(error.to_string()))?;
-    let icon = Icon::from_rgba(tray_icon_pixels(), 16, 16)
+    let icon = Icon::from_rgba(tray_icon_pixels()?, 32, 32)
         .map_err(|error| TrayError::Native(error.to_string()))?;
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
@@ -303,19 +303,12 @@ fn launch_editor() -> Result<(), TrayError> {
 }
 
 #[cfg(windows)]
-fn tray_icon_pixels() -> Vec<u8> {
-    let mut pixels = vec![0u8; 16 * 16 * 4];
-    for y in 0..16 {
-        for x in 0..16 {
-            let index = (y * 16 + x) * 4;
-            let border = x == 0 || y == 0 || x == 15 || y == 15;
-            pixels[index] = if border { 245 } else { 220 };
-            pixels[index + 1] = if border { 36 } else { 20 };
-            pixels[index + 2] = if border { 42 } else { 25 };
-            pixels[index + 3] = 255;
-        }
-    }
-    pixels
+fn tray_icon_pixels() -> Result<Vec<u8>, TrayError> {
+    let image = image::load_from_memory(include_bytes!("../assets/icons/redsamurai.png"))
+        .map_err(|error| TrayError::Native(format!("embedded tray icon decode failed: {error}")))?
+        .resize_exact(32, 32, image::imageops::FilterType::Lanczos3)
+        .into_rgba8();
+    Ok(image.into_raw())
 }
 
 #[cfg(not(windows))]
@@ -398,6 +391,22 @@ mod tests {
 
         assert_eq!(state, WorkerState::Stopped);
         assert!(error.is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn tray_icon_pixels_are_the_embedded_logo() {
+        let pixels = tray_icon_pixels().expect("embedded tray icon must decode");
+
+        assert_eq!(pixels.len(), 32 * 32 * 4);
+        let unique_rgb = pixels
+            .chunks_exact(4)
+            .map(|pixel| (pixel[0], pixel[1], pixel[2]))
+            .collect::<std::collections::HashSet<_>>();
+        assert!(unique_rgb.len() > 4);
+        assert!(pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel[0] > 180 && pixel[1] < 110 && pixel[2] < 120));
     }
 
     #[cfg(windows)]

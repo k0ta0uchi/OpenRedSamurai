@@ -124,6 +124,9 @@ fn show_key_dialog(app: &mut App, ctx: &Context) -> Option<DialogResult> {
 
     Window::new("assign_modal")
         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        // The backdrop lives on the middle layer; keep the dialog above it so
+        // the modal itself remains fully legible.
+        .order(egui::Order::Foreground)
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
@@ -284,6 +287,7 @@ fn show_fire_dialog(app: &mut App, ctx: &Context) -> Option<DialogResult> {
 
     Window::new("fire_modal")
         .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+        .order(egui::Order::Foreground)
         .collapsible(false)
         .resizable(false)
         .title_bar(false)

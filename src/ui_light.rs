@@ -2,7 +2,7 @@
 //! Restyled per Linear Design System (DESIGN.md): Midnight precision instrument.
 
 use crate::app::App;
-use crate::ui_common::{self, theme};
+use crate::ui_common::{self, geo, theme};
 
 use egui::{pos2, vec2, Align2, Color32, FontId, Rect, Sense};
 
@@ -100,7 +100,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .fixed_pos(pos2(0.0, 0.0))
         .show(ctx, |ui| {
             // ---- Left Card: Mouse Color Preview ----
-            let left_card = Rect::from_min_size(pos2(75.0, 195.0), vec2(210.0, 298.0));
+            let left_card = Rect::from_min_size(pos2(75.0, geo::CARD_Y), vec2(210.0, geo::CARD_H));
             ui_common::paint_card(ui, left_card, theme::CARBON, theme::GRAPHITE);
 
             ui.painter().text(
@@ -123,7 +123,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             );
 
             // ---- Center Card: Light Palette & Custom Color ----
-            let center_card = Rect::from_min_size(pos2(295.0, 195.0), vec2(235.0, 298.0));
+            let center_card =
+                Rect::from_min_size(pos2(295.0, geo::CARD_Y), vec2(235.0, geo::CARD_H));
             ui_common::paint_card(ui, center_card, theme::CARBON, theme::GRAPHITE);
 
             ui.painter().text(
@@ -254,7 +255,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             }
 
             // ---- Right Card: LED Mode & Options ----
-            let right_card = Rect::from_min_size(pos2(540.0, 195.0), vec2(200.0, 298.0));
+            let right_card =
+                Rect::from_min_size(pos2(540.0, geo::CARD_Y), vec2(200.0, geo::CARD_H));
             ui_common::paint_card(ui, right_card, theme::CARBON, theme::GRAPHITE);
 
             // 1. 輝度レベル
@@ -352,7 +354,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
     if app.custom_color_open {
         let mut edit = app.temp_rgb;
         egui::Area::new(egui::Id::new("custom_color_popup"))
-            .fixed_pos(pos2(310.0, 440.0))
+            .fixed_pos(pos2(310.0, geo::CARD_Y + 245.0))
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 egui::Frame::none()

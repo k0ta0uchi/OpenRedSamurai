@@ -173,10 +173,16 @@ pub mod geo {
     use egui::Rect;
 
     pub const WINDOW: [f32; 2] = [800.0, 638.0];
-    pub const TAB_Y: f32 = 162.0;
+    /// Main navigation starts 62px below the title bar; the previous 106px
+    /// gap made the editor feel detached from its content.
+    pub const TAB_Y: f32 = 112.0;
     pub const TAB_X0: f32 = 75.0;
     pub const TAB_PITCH: f32 = 102.0;
     pub const TAB_SIZE: [f32; 2] = [85.0, 21.0];
+
+    /// Shared content-card geometry for the compact editor layout.
+    pub const CARD_Y: f32 = 145.0;
+    pub const CARD_H: f32 = 313.0;
 
     pub const MIN_BTN: Rect = Rect {
         min: pos2(743.0, 30.0),
@@ -187,31 +193,33 @@ pub mod geo {
         max: pos2(788.0, 48.0),
     };
 
-    pub const PROFILE_Y: f32 = 513.0;
+    pub const PROFILE_Y: f32 = 478.0;
     pub const PROFILE_X0: f32 = 105.0;
     pub const PROFILE_PITCH: f32 = 123.0;
     pub const PROFILE_SIZE: [f32; 2] = [109.0, 20.0];
 
-    pub const BOTTOM_Y: f32 = 560.0;
+    /// Vertically center the action row inside the footer panel (550..638).
+    pub const BOTTOM_Y: f32 = 580.0;
     pub const BOTTOM_H: f32 = 27.0;
+    pub const BOTTOM_GAP: f32 = 10.0;
     /// (label, x, width) for 保存/ロードファイル/既定/すべてリセット/OK/キャンセル/適用.
     pub const BOTTOM_BUTTONS: [(&str, f32, f32); 7] = [
         ("保存", 88.0, 66.0),
-        ("ロードファイル", 157.0, 95.0),
-        ("既定", 266.0, 62.0),
+        ("ロードファイル", 164.0, 95.0),
+        ("既定", 269.0, 62.0),
         ("すべてリセット", 341.0, 90.0),
-        ("OK", 444.0, 88.0),
-        ("キャンセル", 538.0, 75.0),
-        ("適用", 626.0, 62.0),
+        ("OK", 441.0, 88.0),
+        ("キャンセル", 539.0, 75.0),
+        ("適用", 624.0, 62.0),
     ];
 
     pub const MOUSE_FRONT_RECT: Rect = Rect {
-        min: pos2(100.0, 205.0),
-        max: pos2(300.0, 450.0),
+        min: pos2(100.0, 155.0),
+        max: pos2(300.0, 400.0),
     };
     pub const MOUSE_SIDE_RECT: Rect = Rect {
-        min: pos2(100.0, 205.0),
-        max: pos2(300.0, 450.0),
+        min: pos2(100.0, 155.0),
+        max: pos2(300.0, 400.0),
     };
 
     pub const ROWS_X: f32 = 330.0;
@@ -831,7 +839,8 @@ pub fn linear_profile_button(
         egui::Stroke::new(1.0, border),
     );
 
-    // Active status dot (Acid Lime)
+    // Active status dot (Acid Lime).  Keep the label in a dedicated text
+    // column so the dot never collides with the first Japanese glyph.
     if active {
         let dot_pos = egui::pos2(rect.left() + 10.0, rect.center().y);
         painter.circle_filled(dot_pos, 2.5, theme::ACID_LIME);
@@ -846,15 +855,19 @@ pub fn linear_profile_button(
     };
 
     let text_x = if active {
-        rect.center().x + 4.0
+        rect.left() + 20.0
     } else {
         rect.center().x
     };
     painter.text(
         egui::pos2(text_x, rect.center().y),
-        egui::Align2::CENTER_CENTER,
+        if active {
+            egui::Align2::LEFT_CENTER
+        } else {
+            egui::Align2::CENTER_CENTER
+        },
         label_text,
-        font(12.0),
+        font(if active { 11.5 } else { 12.0 }),
         text_color,
     );
     a11y::button(&response, id, label_text);
@@ -1049,7 +1062,7 @@ pub fn linear_vslider(
 
 #[cfg(test)]
 mod tests {
-    use super::a11y;
+    use super::{a11y, geo};
 
     #[test]
     fn accessibility_ids_are_namespaced_and_stable() {
@@ -1073,5 +1086,17 @@ mod tests {
             a11y::name("red-samurai.titlebar.close", ""),
             "red-samurai.titlebar.close [a11y-id: red-samurai.titlebar.close]"
         );
+    }
+
+    #[test]
+    fn compact_layout_keeps_bottom_actions_on_one_baseline() {
+        let buttons = geo::BOTTOM_BUTTONS;
+        for pair in buttons.windows(2) {
+            let (_, left_x, left_w) = pair[0];
+            let (_, right_x, _) = pair[1];
+            assert!((right_x - (left_x + left_w) - geo::BOTTOM_GAP).abs() < f32::EPSILON);
+        }
+        assert!(geo::CARD_Y > geo::TAB_Y + geo::TAB_SIZE[1]);
+        assert!(geo::PROFILE_Y >= geo::CARD_Y + geo::CARD_H);
     }
 }

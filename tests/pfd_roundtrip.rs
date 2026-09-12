@@ -10,10 +10,19 @@ use redsamurai_config::profile::{dpi_code_to_display, DpiStage, Profile};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Locate the real RSProfile1.pfd: shell Documents folder first (the original
-/// software stores profiles in the (possibly OneDrive-redirected) Documents
-/// dir), then the known absolute fallback.
+/// Locate the immutable repository capture first.  The live Documents copy is
+/// mutable (the application and manual hardware tests rewrite it), so using it
+/// as the primary fixture makes this test depend on whatever profile happened
+/// to be selected on the workstation.  Keep the live paths as a fallback for
+/// source checkouts that do not include the capture fixtures.
 fn sample_profile_path() -> Option<PathBuf> {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+        "tests/fixtures/captures/rs-observation-20260909T061712713Z-af8fbf35/RSProfile1.pfd.pre-action.bak",
+    );
+    if fixture.is_file() {
+        return Some(fixture);
+    }
+
     if let Some(doc_dir) = Profile::doc_dir() {
         let p = doc_dir.join("RSProfile1.pfd");
         if p.is_file() {

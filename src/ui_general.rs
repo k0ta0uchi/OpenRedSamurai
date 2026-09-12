@@ -8,19 +8,26 @@ use crate::ui_common::{self, geo, theme};
 use egui::{pos2, vec2, Align2, Color32, FontId, Pos2, Rect, Sense};
 
 /// Assignment rows top edge (front: 6 rows, side: 12 rows).
-const ROWS_Y_FRONT: f32 = 212.0;
-const ROWS_Y_SIDE: f32 = 203.0;
+const ROWS_Y_FRONT: f32 = geo::CARD_Y + 17.0;
+const ROWS_Y_SIDE: f32 = geo::CARD_Y + 8.0;
 
 /// (label, profile key, min, max, label y, small track) for the right column.
 const SLIDERS: [(&str, &str, i32, i32, f32, bool); 4] = [
-    ("加速度", "Acceleration", 0, 2, 198.0, false),
-    ("POINTER SPEED", "MouseSensitivity", 1, 20, 247.0, false),
+    ("加速度", "Acceleration", 0, 2, geo::CARD_Y + 3.0, false),
+    (
+        "POINTER SPEED",
+        "MouseSensitivity",
+        1,
+        20,
+        geo::CARD_Y + 52.0,
+        false,
+    ),
     (
         "スクロールスピード",
         "WheelScrollLines",
         1,
         10,
-        295.0,
+        geo::CARD_Y + 100.0,
         false,
     ),
     (
@@ -28,7 +35,7 @@ const SLIDERS: [(&str, &str, i32, i32, f32, bool); 4] = [
         "DoubleClickSpeed",
         1,
         10,
-        346.0,
+        geo::CARD_Y + 151.0,
         true,
     ),
 ];
@@ -83,13 +90,14 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .fixed_pos(pos2(0.0, 0.0))
         .show(ctx, |ui| {
             // ---- Left Card: Mouse Preview (FRONT / SIDE) ----
-            let left_card_rect = Rect::from_min_size(pos2(75.0, 195.0), vec2(230.0, 298.0));
+            let left_card_rect =
+                Rect::from_min_size(pos2(75.0, geo::CARD_Y), vec2(230.0, geo::CARD_H));
             ui_common::paint_card(ui, left_card_rect, theme::CARBON, theme::GRAPHITE);
 
             let mrect = if app.side {
-                Rect::from_min_size(pos2(90.0, 205.0), vec2(200.0, 235.0))
+                Rect::from_min_size(pos2(90.0, geo::CARD_Y + 10.0), vec2(200.0, 235.0))
             } else {
-                Rect::from_min_size(pos2(90.0, 205.0), vec2(200.0, 235.0))
+                Rect::from_min_size(pos2(90.0, geo::CARD_Y + 10.0), vec2(200.0, 235.0))
             };
             let msize: [f32; 2] = if app.side {
                 [547.0, 1365.0]
@@ -104,8 +112,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             );
 
             // FRONT / SIDE toggle pill buttons inside the card
-            let front_r = Rect::from_min_size(pos2(95.0, 456.0), vec2(90.0, 24.0));
-            let side_r = Rect::from_min_size(pos2(195.0, 456.0), vec2(90.0, 24.0));
+            let front_r = Rect::from_min_size(pos2(95.0, geo::CARD_Y + 261.0), vec2(90.0, 24.0));
+            let side_r = Rect::from_min_size(pos2(195.0, geo::CARD_Y + 261.0), vec2(90.0, 24.0));
             if ui_common::linear_button(
                 ui,
                 "side_front",
@@ -240,7 +248,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             }
 
             // ---- Right Column: Sliders & Settings Card ----
-            let right_card_rect = Rect::from_min_size(pos2(512.0, 195.0), vec2(228.0, 298.0));
+            let right_card_rect =
+                Rect::from_min_size(pos2(512.0, geo::CARD_Y), vec2(228.0, geo::CARD_H));
             ui_common::paint_card(ui, right_card_rect, theme::CARBON, theme::GRAPHITE);
 
             // Sliders
@@ -279,7 +288,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             }
 
             // Double-click test target panel (inside right card)
-            let trect = Rect::from_min_size(pos2(660.0, 348.0), vec2(66.0, 48.0));
+            let trect = Rect::from_min_size(pos2(660.0, geo::CARD_Y + 153.0), vec2(66.0, 48.0));
             let tresp = ui.interact(trect, egui::Id::new("dblclick_test"), Sense::click());
             ui_common::a11y::button(&tresp, "general.double-click-test", "ダブルクリックテスト");
             let thover = tresp.hovered();
@@ -336,7 +345,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
 
             // Polling rate
             ui.painter().text(
-                pos2(geo::SLIDER_X + 6.0, 420.0),
+                pos2(geo::SLIDER_X + 6.0, geo::CARD_Y + 225.0),
                 Align2::LEFT_TOP,
                 "ポーリングレート",
                 FontId::proportional(11.0),
@@ -348,7 +357,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 let resp = ui_common::linear_checkbox(
                     ui,
                     &format!("poll_{k}"),
-                    pos2(geo::SLIDER_X + 6.0 + k as f32 * 50.0, 442.0),
+                    pos2(geo::SLIDER_X + 6.0 + k as f32 * 50.0, geo::CARD_Y + 247.0),
                     hz,
                     &mut on,
                 );

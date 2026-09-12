@@ -50,22 +50,25 @@ Pure widget helpers. NO dependency on `crate::app` (Worker 4 wires them).
 /// Shared geometry constants (800x638 window), measured from the reference screenshots.
 pub mod geo {
     pub const WINDOW: [f32; 2] = [800.0, 638.0];
-    pub const TAB_Y: f32 = 162.0;
+    pub const TAB_Y: f32 = 112.0;
     pub const TAB_X0: f32 = 75.0;
     pub const TAB_PITCH: f32 = 102.0;
     pub const TAB_SIZE: [f32; 2] = [85.0, 21.0];
+    pub const CARD_Y: f32 = 145.0;
+    pub const CARD_H: f32 = 313.0;
     pub const MIN_BTN: egui::Rect;   // titlebar minimize (743,30 22x18)
     pub const CLOSE_BTN: egui::Rect; // titlebar close    (766,30 22x18)
-    pub const PROFILE_Y: f32 = 513.0;
+    pub const PROFILE_Y: f32 = 478.0;
     pub const PROFILE_X0: f32 = 105.0;
     pub const PROFILE_PITCH: f32 = 123.0;
     pub const PROFILE_SIZE: [f32; 2] = [109.0, 20.0];
-    pub const BOTTOM_Y: f32 = 560.0;
+    pub const BOTTOM_Y: f32 = 580.0;
     pub const BOTTOM_H: f32 = 27.0;
+    pub const BOTTOM_GAP: f32 = 10.0;
     // x/width pairs for the 7 bottom buttons: 保存/ロードファイル/既定/すべてリセット/OK/キャンセル/適用
     pub const BOTTOM_BUTTONS: [(&'static str, f32, f32); 7];
-    pub const MOUSE_FRONT_RECT: egui::Rect;   // (100,205) 200x245
-    pub const MOUSE_SIDE_RECT: egui::Rect;    // (100,205) 200x245
+    pub const MOUSE_FRONT_RECT: egui::Rect;   // (100,155) 200x245
+    pub const MOUSE_SIDE_RECT: egui::Rect;    // (100,155) 200x245
     pub const ROWS_X: f32 = 330.0;            // assignment rows left
     pub const ROW_W: f32 = 173.0;
     pub const ROW_H: f32 = 23.0;

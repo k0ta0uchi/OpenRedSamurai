@@ -3,7 +3,7 @@
 
 use crate::app::App;
 use crate::profile::{dpi_code_to_display, DpiStage};
-use crate::ui_common::{self, theme};
+use crate::ui_common::{self, geo, theme};
 
 use egui::{pos2, vec2, Align2, FontId, Rect, Sense};
 
@@ -19,7 +19,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .fixed_pos(pos2(0.0, 0.0))
         .show(ctx, |ui| {
             // ---- Left Card: Current Stage Selector ----
-            let left_card = Rect::from_min_size(pos2(75.0, 195.0), vec2(130.0, 298.0));
+            let left_card = Rect::from_min_size(pos2(75.0, geo::CARD_Y), vec2(130.0, geo::CARD_H));
             ui_common::paint_card(ui, left_card, theme::CARBON, theme::GRAPHITE);
 
             ui.painter().text(
@@ -91,7 +91,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
 
             for (i, st) in stages.iter().enumerate() {
                 let cx = col_x0 + i as f32 * (col_w + col_gap);
-                let card_rect = Rect::from_min_size(pos2(cx, 195.0), vec2(col_w, 298.0));
+                let card_rect =
+                    Rect::from_min_size(pos2(cx, geo::CARD_Y), vec2(col_w, geo::CARD_H));
                 let is_cur = i == current;
 
                 let (bg, border) = if is_cur {
