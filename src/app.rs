@@ -411,12 +411,7 @@ impl eframe::App for App {
                 .fixed_pos(state.pos)
                 .order(egui::Order::Foreground)
                 .show(ctx, |ui| {
-                    let (p, c) = menu::draw(
-                        ui,
-                        &mut state,
-                        &self.assets.menu_item_n,
-                        &self.assets.menu_item_h,
-                    );
+                    let (p, c) = menu::draw(ui, &mut state);
                     picked = p;
                     closed = c;
                 });

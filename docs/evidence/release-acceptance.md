@@ -61,8 +61,8 @@ second, independently computed SHA-256 sidecar and `release-manifest.json`.
   automatically uses the local AppData fallback.
 - `README.md` and `README.ja.md` describe the same v1.0.0 scope and deferred
   boundaries.
-- `LICENSE` applies to the original source; `NOTICE.md` keeps bundled visual
-  and compatibility resources under any separate upstream terms.
+- `LICENSE` covers the source and retained project assets; `NOTICE.md` records
+  that upstream skin, localization, and compatibility resources were removed.
 - `installer/package-release.ps1` produces the Windows x64 zip, sidecar, and
   manifest entries for both the editor and native installer.
 

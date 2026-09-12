@@ -351,7 +351,7 @@ pub fn checkbox(
     response
 }
 
-/// Thumb texture size in px (bar1.png is 15x15).
+/// Legacy textured-slider thumb size in px.
 const H_THUMB: f32 = 15.0;
 /// Vertical slider thumb height in px.
 const V_THUMB_H: f32 = 12.0;

@@ -3,7 +3,6 @@
 //! Generic widget: draws the menu tree, returns the picked action (if any).
 //! No dependency on `crate::app` — the caller (app.rs) applies the action.
 
-use crate::assets::Tex;
 use crate::funcs::MenuAction;
 use crate::funcs::MenuItem;
 use crate::ui_common::theme;
@@ -40,12 +39,7 @@ impl Default for MenuState {
 /// Note: takes `&mut Ui` (instead of the `&Ui` sketched in the contract) because
 /// egui 0.29 can only register interactive widgets through `&mut Ui` — needed so
 /// rows receive hover/clicks instead of the widgets behind the overlay.
-pub fn draw(
-    ui: &mut egui::Ui,
-    state: &mut MenuState,
-    _menu_item_n: &Tex,
-    _menu_item_h: &Tex,
-) -> (Option<MenuAction>, bool) {
+pub fn draw(ui: &mut egui::Ui, state: &mut MenuState) -> (Option<MenuAction>, bool) {
     // Transient state (which submenu is open) persists across frames via egui memory.
     let open_sub_id = Id::new("assignment_menu_open_sub");
     let pass_stamp_id = Id::new("assignment_menu_pass_stamp");
@@ -61,7 +55,7 @@ pub fn draw(
             .flatten()
     };
 
-    // ---- geometry: one 212x27 texture-stretched row per item, clamped to screen ----
+    // ---- geometry: one procedural row per item, clamped to screen ----
     let screen = ui.ctx().screen_rect();
     let column = |origin: Pos2, count: usize| -> Vec<Rect> {
         let x = origin
@@ -295,12 +289,8 @@ mod tests {
                     items: build_menu(&[]),
                 };
 
-                // Dummy texture is not used for procedural Linear menu, but passes the signature
-                let tex =
-                    ctx.load_texture("dummy", egui::ColorImage::example(), Default::default());
-
                 // 1. Initial draw (no submenu open)
-                let (picked1, closed1) = draw(ui, &mut state, &tex, &tex);
+                let (picked1, closed1) = draw(ui, &mut state);
                 assert!(picked1.is_none());
                 assert!(!closed1);
 
@@ -308,13 +298,13 @@ mod tests {
                 let open_sub_id = Id::new("assignment_menu_open_sub");
                 ui.memory_mut(|m| m.data.insert_temp(open_sub_id, Some(5usize)));
 
-                let (picked2, closed2) = draw(ui, &mut state, &tex, &tex);
+                let (picked2, closed2) = draw(ui, &mut state);
                 assert!(picked2.is_none());
                 assert!(!closed2);
 
                 // 3. Simulate switching immediately from single key (len 13) to combo key (len 1)
                 ui.memory_mut(|m| m.data.insert_temp(open_sub_id, Some(6usize)));
-                let (picked3, closed3) = draw(ui, &mut state, &tex, &tex);
+                let (picked3, closed3) = draw(ui, &mut state);
                 assert!(picked3.is_none());
                 assert!(!closed3);
             });

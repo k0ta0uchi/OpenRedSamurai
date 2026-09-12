@@ -4,11 +4,11 @@ The original Rust source code and project documentation in this repository are
 licensed under the MIT License in [`LICENSE`](LICENSE), Copyright (c) 2026
 `k0ta0uchi`.
 
-The MIT grant applies only to material authored for OpenRedSamurai. The visual
-and compatibility files under `assets/images/` and the RED SAMURAI branding
-files under `assets/icons/` are kept as device-compatible resources. Their
-ownership and any upstream terms remain separate from the MIT license; this
-notice does not relicense third-party material. Replace or remove a resource
-before redistributing it if you do not hold the required permission.
+The repository retains only the three project mouse-layout images under
+`assets/images/0409/background/` and the project application icons under
+`assets/icons/`. The upstream skin, localization, and compatibility resources
+were removed from the source tree and are not embedded in the executable.
+These retained project assets are distributed with OpenRedSamurai under the
+MIT License together with the source.
 
 Rust dependencies retain the licenses declared by their respective crates.

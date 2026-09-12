@@ -1,40 +1,21 @@
-# Assets & shared widgets — CONTRACT (implemented by Worker 3)
+# Assets & shared widgets — CONTRACT
 
-Files owned by Worker 3: `src/assets.rs`, `src/ui_common.rs`.
-Everything else is read-only for Worker 3.
+`src/assets.rs` embeds only the project mouse-layout images listed below.
+All controls, cards, tabs, sliders, menus, and buttons are painted by the Rust
+UI; the removed upstream skin files are not required at runtime.
 
 ## assets.rs
 
-Embeds the original skin PNGs from `assets/images/0409/...` via `include_bytes!`
-and decodes them into `egui::TextureHandle`s (use the `image` crate).
+Embeds the three project mouse-layout PNGs via `include_bytes!` and decodes
+them into `egui::TextureHandle`s (use the `image` crate).
 
 ```rust
 pub type Tex = egui::TextureHandle;
 
 pub struct Assets {
-    pub bg_main: Tex,        // background/cfgMainback.png       (801x638 window frame incl. header art)
-    pub mouse_front: Tex,    // background/mouse-layout-front.png (622x883, has ①..⑥ circles)
-    pub mouse_side: Tex,     // background/mouse-layout-side.png  (547x1365, plain keypad)
-    pub mouse_color: Tex,    // background/mouse-layout-Color.png (622x883, no circles)
-    pub row_n: Tex,          // buttons/ButtonAssign-1.png        (173x23 assignment row normal)
-    pub row_sel: Tex,        // buttons/ButtonAssign-2.png        (173x23 assignment row selected)
-    pub profile_n: Tex,      // buttons/ProfileButton-1.png       (109x20 profile button normal)
-    pub profile_sel: Tex,    // buttons/ProfileButton-3.png       (109x21 profile button selected)
-    pub btn_n: Tex,          // background/main-ok-btn-n.png      (94x27 bottom button normal)
-    pub btn_d: Tex,          // background/main-ok-btn-d.png      (94x27 bottom button pressed)
-    pub tab_a: Tex,          // background/tab-a.png              (85x21 active tab)
-    pub tab_n: Tex,          // background/tab-n.png              (84x21 inactive tab)
-    pub track_h: Tex,        // background/trackbar-back-speed.png   (210x19 horizontal slider)
-    pub track_h_small: Tex,  // background/trackbar-back-speed-dbclick.png (59x19; stretch to 122 wide)
-    pub thumb: Tex,          // background/bar1.png               (15x15 red LED thumb)
-    pub track_v: Tex,        // background/DPI-TRACK-R.png        (22x182 vertical DPI track)
-    pub radio_off: Tex,      // background/radio1.png             (13x13)
-    pub radio_on: Tex,       // background/radio2.png             (13x13)
-    pub dpi_label_off: Tex,  // background/DPI-1.png              (43x17)
-    pub dpi_label_on: Tex,   // background/DPI-2.png              (43x17, with white check)
-    pub test_area: Tex,      // background/DB-CLICK-TEST-AREA.png (109x150 red spiral)
-    pub menu_item_n: Tex,    // background/funcmenu_1.png         (212x27 menu row)
-    pub menu_item_h: Tex,    // background/funcmenu_2.png         (212x27 menu row hover)
+    pub mouse_front: Tex,    // background/mouse-layout-front.png
+    pub mouse_side: Tex,     // background/mouse-layout-side.png
+    pub mouse_color: Tex,    // background/mouse-layout-Color.png
 }
 
 impl Assets {
