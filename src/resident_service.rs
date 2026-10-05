@@ -362,20 +362,6 @@ fn run_device_session<'a>(
     reconnect: bool,
     recovery_log: Option<&std::path::Path>,
 ) -> Result<(), ResidentServiceError> {
-    write_recovery_trace(recovery_log, "event=input_open_start");
-    let mut device = match resident_platform::open_resident_input_device_for_service() {
-        Ok(device) => {
-            write_recovery_trace(recovery_log, "event=input_open_ok");
-            device
-        }
-        Err(error) => {
-            write_recovery_trace(
-                recovery_log,
-                &format!("event=input_open_error error={error}"),
-            );
-            return Err(error.into());
-        }
-    };
     let initial_suppressed = compute_suppressed_side_keys(runtime);
     write_recovery_trace(
         recovery_log,
@@ -384,7 +370,21 @@ fn run_device_session<'a>(
             initial_suppressed.len()
         ),
     );
-    device.update_suppressed_keys(&initial_suppressed);
+    write_recovery_trace(recovery_log, "event=input_open_start");
+    let mut device =
+        match resident_platform::open_resident_input_device_for_service(&initial_suppressed) {
+            Ok(device) => {
+                write_recovery_trace(recovery_log, "event=input_open_ok");
+                device
+            }
+            Err(error) => {
+                write_recovery_trace(
+                    recovery_log,
+                    &format!("event=input_open_error error={error}"),
+                );
+                return Err(error.into());
+            }
+        };
     if reconnect {
         reapply_rust_owned_configuration(profiles, control, stop, recovery_log);
     }

@@ -1075,11 +1075,13 @@ struct KeyboardDuplicateState {
 
 #[cfg(windows)]
 impl KeyboardDuplicateState {
-    fn new() -> std::sync::Arc<Self> {
+    fn new(initial_suppressed: &[(u16, u32)]) -> std::sync::Arc<Self> {
+        let mut filter = crate::keyboard_suppression::KeyboardDuplicateFilter::default();
+        if !initial_suppressed.is_empty() {
+            filter.set_suppressed_keys(initial_suppressed.iter().copied());
+        }
         std::sync::Arc::new(Self {
-            filter: std::sync::Mutex::new(
-                crate::keyboard_suppression::KeyboardDuplicateFilter::default(),
-            ),
+            filter: std::sync::Mutex::new(filter),
             wake: std::sync::Condvar::new(),
             hook_alive: std::sync::atomic::AtomicBool::new(false),
             hook_error: std::sync::Mutex::new(None),
@@ -1865,12 +1867,13 @@ impl RawInputReader {
         suppress_legacy: bool,
         all_keyboard_relay: bool,
         observe_only: bool,
+        initial_suppressed: &[(u16, u32)],
     ) -> Result<Self, PlatformError> {
         let (ready_sender, ready_receiver) = std::sync::mpsc::sync_channel(1);
         let (event_sender, event_receiver) = std::sync::mpsc::channel();
         let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (suppression_hook, suppression_state) = if suppress_legacy {
-            let state = KeyboardDuplicateState::new();
+            let state = KeyboardDuplicateState::new(initial_suppressed);
             let hook = KeyboardSuppressionHook::new(state.clone(), shutdown_requested.clone())?;
             (Some(hook), Some(state))
         } else {
@@ -2008,6 +2011,9 @@ impl RawInputReader {
 #[cfg(windows)]
 impl Drop for RawInputReader {
     fn drop(&mut self) {
+        if let Some(state) = self.suppression_state.as_ref() {
+            state.set_suppressed_keys([]);
+        }
         self.request_shutdown();
         if let Some(thread) = self.thread.take() {
             let _ = join_raw_input_thread(thread, RAW_INPUT_SHUTDOWN_TIMEOUT);
@@ -2815,6 +2821,9 @@ unsafe extern "system" fn raw_input_window_proc(
                     }
                 }
                 if is_target {
+                    if let Some(suppression_state) = (*state).suppression_state.as_ref() {
+                        suppression_state.set_suppressed_keys([]);
+                    }
                     (*state)
                         .shutdown_requested
                         .store(true, std::sync::atomic::Ordering::Release);
@@ -3349,7 +3358,7 @@ impl ResidentInputDevice {
 /// keyboard-class handle is opened because Windows rejects synchronous reads
 /// from that collection with `ERROR_ACCESS_DENIED`.
 pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError> {
-    open_resident_input_device_internal(false, false, false)
+    open_resident_input_device_internal(false, false, false, &[])
 }
 
 #[cfg(windows)]
@@ -3359,15 +3368,23 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 /// default for the service unless `REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION=1`
 /// is set or all-keyboard relay is active. The diagnostic all-keyboard relay
 /// is opt-in through `REDSAMURAI_ENABLE_KEYBOARD_RELAY=1`.
-pub(crate) fn open_resident_input_device_for_service() -> Result<ResidentInputDevice, PlatformError>
-{
+/// The `initial_suppressed` keys are passed directly to hook creation so
+/// suppression is active from the very first hook callback without a startup race.
+pub(crate) fn open_resident_input_device_for_service(
+    initial_suppressed: &[(u16, u32)],
+) -> Result<ResidentInputDevice, PlatformError> {
     let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
     let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
     let suppression_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION")
         .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false);
     let suppress_legacy = !all_keyboard_relay && !suppression_disabled;
-    open_resident_input_device_internal(suppress_legacy, all_keyboard_relay, observe_only)
+    open_resident_input_device_internal(
+        suppress_legacy,
+        all_keyboard_relay,
+        observe_only,
+        initial_suppressed,
+    )
 }
 
 #[cfg(windows)]
@@ -3375,6 +3392,7 @@ fn open_resident_input_device_internal(
     suppress_legacy: bool,
     all_keyboard_relay: bool,
     observe_only: bool,
+    initial_suppressed: &[(u16, u32)],
 ) -> Result<ResidentInputDevice, PlatformError> {
     let api = hidapi::HidApi::new().map_err(|error| PlatformError::Discovery {
         message: error.to_string(),
@@ -3395,7 +3413,13 @@ fn open_resident_input_device_internal(
         })
         .ok_or(PlatformError::InputUnavailable)?;
     let path = info.path().to_string_lossy().into_owned();
-    let reader = RawInputReader::new(path, suppress_legacy, all_keyboard_relay, observe_only)?;
+    let reader = RawInputReader::new(
+        path,
+        suppress_legacy,
+        all_keyboard_relay,
+        observe_only,
+        initial_suppressed,
+    )?;
     Ok(ResidentInputDevice { reader })
 }
 
