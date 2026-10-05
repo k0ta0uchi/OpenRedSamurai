@@ -2554,6 +2554,9 @@ fn raw_input_thread(
                 keyboard_relay_windows::KEYBOARD_USAGE,
                 raw_device.dwFlags.0
             ));
+            if !observe_only {
+                write_relay_trace("event=keyboard_relay_activated mode=startup");
+            }
         }
 
         if shutdown_requested.load(std::sync::atomic::Ordering::Acquire) {
@@ -2700,11 +2703,12 @@ unsafe extern "system" fn raw_input_window_proc(
                             sample.flags
                         ));
                         let should_activate = event.device_identity_available
-                            && (*state)
-                                .relay_state
-                                .as_mut()
-                                .map(|relay| relay.observe_probe_edge(sample))
-                                .unwrap_or(false);
+                            && (event.is_target_device
+                                || (*state)
+                                    .relay_state
+                                    .as_mut()
+                                    .map(|relay| relay.observe_probe_edge(sample))
+                                    .unwrap_or(false));
                         if should_activate {
                             let activation = activate_keyboard_relay(&mut *state, hwnd);
                             if let Err(message) = activation {
