@@ -81,3 +81,32 @@ fn press_and_release_edges_are_correlated_independently() {
         KeyboardFilterDecision::Suppress
     );
 }
+
+#[test]
+fn registered_suppressed_keys_are_suppressed_immediately() {
+    let mut filter = KeyboardDuplicateFilter::new(8);
+    // Button 16 factory key: VK=0x30 ('0'), ScanCode=0x0B
+    filter.set_suppressed_keys([(0x30, 0x0B)]);
+
+    // Down edge is suppressed immediately without target observation
+    assert_eq!(
+        filter.classify(hardware_sample(0x30, 0x0B, 0, 100)),
+        KeyboardFilterDecision::Suppress
+    );
+    // Up edge is also suppressed immediately
+    assert_eq!(
+        filter.classify(hardware_sample(0x30, 0x0B, 0x80, 110)),
+        KeyboardFilterDecision::Suppress
+    );
+    // Injected events are not suppressed
+    assert_eq!(
+        filter.classify(hardware_sample(0x30, 0x0B, 0x10, 120)),
+        KeyboardFilterDecision::Pass
+    );
+    // Unregistered keys pass through
+    assert_eq!(
+        filter.classify(hardware_sample(0x31, 0x02, 0, 130)),
+        KeyboardFilterDecision::Pass
+    );
+}
+

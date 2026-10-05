@@ -636,21 +636,7 @@ impl NativeKeyboardPassthrough {
     }
 }
 
-/// Factory physical side-button hardware bindings: (button_number, factory_usage, virtual_key, scan_code).
-pub const SIDE_BUTTON_FACTORY_KEYS: &[(u8, u8, u16, u32)] = &[
-    (7, 0x1E, 0x31, 0x02),
-    (8, 0x1F, 0x32, 0x03),
-    (9, 0x20, 0x33, 0x04),
-    (10, 0x21, 0x34, 0x05),
-    (11, 0x22, 0x35, 0x06),
-    (12, 0x23, 0x36, 0x07),
-    (13, 0x24, 0x37, 0x08),
-    (14, 0x25, 0x38, 0x09),
-    (15, 0x26, 0x39, 0x0A),
-    (16, 0x27, 0x30, 0x0B),
-    (17, 0x2D, 0xBD, 0x0C),
-    (18, 0x34, 0xDE, 0x0D),
-];
+pub use crate::resident_platform::SIDE_BUTTON_FACTORY_KEYS;
 
 /// Compute the list of (virtual_key, scan_code) pairs that should be suppressed
 /// by the low-level keyboard hook because their factory side-button key has been

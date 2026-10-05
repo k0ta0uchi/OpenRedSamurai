@@ -152,6 +152,10 @@ impl KeyboardDuplicateFilter {
             return KeyboardFilterDecision::Pass;
         }
 
+        if self.is_suppressed_key(event.virtual_key, event.scan_code) {
+            return KeyboardFilterDecision::Suppress;
+        }
+
         self.prune(event.timestamp_ms);
 
         let Some(index) = self.pending.iter().position(|raw| {

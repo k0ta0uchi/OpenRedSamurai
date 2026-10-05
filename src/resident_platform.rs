@@ -1057,7 +1057,35 @@ fn send_windows_mouse_event(event: MouseEvent) -> Result<(), PlatformError> {
     send_windows_input(input, "mouse")
 }
 
-#[cfg(windows)]
+/// Factory physical side-button hardware bindings: (button_number, factory_usage, virtual_key, scan_code).
+pub const SIDE_BUTTON_FACTORY_KEYS: &[(u8, u8, u16, u32)] = &[
+    (7, 0x1E, 0x31, 0x02),
+    (8, 0x1F, 0x32, 0x03),
+    (9, 0x20, 0x33, 0x04),
+    (10, 0x21, 0x34, 0x05),
+    (11, 0x22, 0x35, 0x06),
+    (12, 0x23, 0x36, 0x07),
+    (13, 0x24, 0x37, 0x08),
+    (14, 0x25, 0x38, 0x09),
+    (15, 0x26, 0x39, 0x0A),
+    (16, 0x27, 0x30, 0x0B),
+    (17, 0x2D, 0xBD, 0x0C),
+    (18, 0x34, 0xDE, 0x0D),
+];
+
+/// Resolve the factory button usage for a given (virtual_key, scan_code) pair.
+pub fn side_button_usage_from_vk_scan(vk: u16, scan: u32) -> Option<u8> {
+    for &(_button, usage, factory_vk, factory_scan) in SIDE_BUTTON_FACTORY_KEYS {
+        if vk == factory_vk && (scan == 0 || scan == factory_scan) {
+            return Some(usage);
+        }
+    }
+    if vk == 0xBA && (scan == 0 || scan == 0x28) {
+        return Some(0x33);
+    }
+    None
+}
+
 /// Raw Input adapter for the resident keyboard-class collection.
 ///
 /// Windows deliberately denies synchronous reads from the keyboard-class HID
@@ -1075,6 +1103,7 @@ struct KeyboardDuplicateState {
     hook_alive: std::sync::atomic::AtomicBool,
     hook_error: std::sync::Mutex<Option<String>>,
     trace: std::sync::Mutex<Option<std::fs::File>>,
+    event_sender: std::sync::Mutex<Option<std::sync::mpsc::Sender<Result<ButtonTransition, String>>>>,
 }
 
 #[cfg(windows)]
@@ -1098,7 +1127,26 @@ impl KeyboardDuplicateState {
                         .ok()
                 }),
             ),
+            event_sender: std::sync::Mutex::new(None),
         })
+    }
+
+    fn set_event_sender(&self, sender: std::sync::mpsc::Sender<Result<ButtonTransition, String>>) {
+        let mut slot = match self.event_sender.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *slot = Some(sender);
+    }
+
+    fn emit_suppressed_transition(&self, transition: ButtonTransition) {
+        let slot = match self.event_sender.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(sender) = slot.as_ref() {
+            let _ = sender.send(Ok(transition));
+        }
     }
 
     fn observe_target(&self, sample: crate::keyboard_suppression::RawKeyboardSample) {
@@ -1340,12 +1388,35 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 LegacyKeyboardSample::new(virtual_key, info.scanCode, info.flags.0, info.time);
             let state = LOW_LEVEL_KEYBOARD_STATE.with(|slot| slot.borrow().clone());
             if let Some(state) = state {
+                let is_custom_suppressed =
+                    state.is_suppressed_key(event.virtual_key, event.scan_code);
                 let decision = state.classify(event);
                 write_relay_trace(&format!(
                     "event=low_level_hook decision={:?} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X}",
                     decision, event.virtual_key, event.scan_code, event.flags
                 ));
                 if decision == KeyboardFilterDecision::Suppress {
+                    if is_custom_suppressed {
+                        if let Some(usage) =
+                            side_button_usage_from_vk_scan(event.virtual_key, event.scan_code)
+                        {
+                            let transition = if event.is_break() {
+                                ButtonTransition::released(usage)
+                            } else {
+                                ButtonTransition::pressed(usage)
+                            };
+                            write_relay_trace(&format!(
+                                "event=suppressed_button_transition usage=0x{:02X} edge={}",
+                                usage,
+                                if transition.is_pressed() {
+                                    "press"
+                                } else {
+                                    "release"
+                                }
+                            ));
+                            state.emit_suppressed_transition(transition);
+                        }
+                    }
                     return windows::Win32::Foundation::LRESULT(1);
                 }
             }
@@ -1883,6 +1954,7 @@ impl RawInputReader {
         let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (suppression_hook, suppression_state) = if suppress_legacy {
             let state = KeyboardDuplicateState::new(initial_suppressed);
+            state.set_event_sender(event_sender.clone());
             let hook = KeyboardSuppressionHook::new(state.clone(), shutdown_requested.clone())?;
             (Some(hook), Some(state))
         } else {
@@ -2765,9 +2837,15 @@ unsafe extern "system" fn raw_input_window_proc(
                     ));
                     if let Some(suppression_state) = (*state).suppression_state.as_ref() {
                         if event.is_target_device {
-                            suppression_state.observe_target(event.sample);
-                            if let Some(transition) = event.transition {
-                                let _ = (*state).sender.send(Ok(transition));
+                            let is_suppressed = suppression_state.is_suppressed_key(
+                                event.sample.virtual_key,
+                                event.sample.scan_code as u32,
+                            );
+                            if !is_suppressed {
+                                suppression_state.observe_target(event.sample);
+                                if let Some(transition) = event.transition {
+                                    let _ = (*state).sender.send(Ok(transition));
+                                }
                             }
                         } else {
                             let is_suppressed = suppression_state.is_suppressed_key(
@@ -3413,12 +3491,12 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 pub fn open_resident_input_device_for_service(
     initial_suppressed: &[(u16, u32)],
 ) -> Result<ResidentInputDevice, PlatformError> {
-    let relay_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_RELAY")
+    let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
+    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
+    let suppression_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION")
         .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false);
-    let all_keyboard_relay = !relay_disabled;
-    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
-    let suppress_legacy = !all_keyboard_relay;
+    let suppress_legacy = !all_keyboard_relay && !suppression_disabled;
     open_resident_input_device_internal(
         suppress_legacy,
         all_keyboard_relay,

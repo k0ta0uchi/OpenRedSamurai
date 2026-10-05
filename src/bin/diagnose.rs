@@ -13,8 +13,9 @@ use std::time::{Duration, Instant};
 #[cfg(windows)]
 use redsamurai_config::resident_platform::{
     is_resident_input_interface, normalize_raw_input_device_path,
-    open_resident_input_device_for_service, ResidentInputCandidate, RED_SAMURAI_PRODUCT_ID,
-    RED_SAMURAI_VENDOR_ID, RESIDENT_INPUT_REPORT_LENGTH,
+    open_resident_input_device_for_service, KeyboardEvent, ResidentInputCandidate,
+    ResidentPlatform, RED_SAMURAI_PRODUCT_ID, RED_SAMURAI_VENDOR_ID,
+    RESIDENT_INPUT_REPORT_LENGTH,
 };
 
 struct DiagnosticConfig {
@@ -22,6 +23,7 @@ struct DiagnosticConfig {
     scan: u32,
     timeout: Option<Duration>,
     dry_run: bool,
+    send_action: bool,
 }
 
 impl Default for DiagnosticConfig {
@@ -32,6 +34,7 @@ impl Default for DiagnosticConfig {
             scan: 0x0B,
             timeout: None,
             dry_run: false,
+            send_action: false,
         }
     }
 }
@@ -72,6 +75,9 @@ fn parse_args() -> Result<DiagnosticConfig, String> {
             "--dry-run" => {
                 config.dry_run = true;
             }
+            "--send-action" => {
+                config.send_action = true;
+            }
             "-h" | "--help" => {
                 print_help();
                 std::process::exit(0);
@@ -93,6 +99,7 @@ fn print_help() {
           --vk <hex/dec>      Virtual key code to suppress (default: 0x30 for '0')\n\
           --scan <hex/dec>    Scan code to suppress (default: 0x0B for '0')\n\
           --timeout <secs>    Automatically exit after the specified seconds\n\
+          --send-action       Emit Ctrl+Alt+Shift+P SendInput on Button 16 (for screenshot test)\n\
           --dry-run           List HID devices and candidates without starting Raw Input\n\
           -h, --help          Print this help message\n"
     );
@@ -259,6 +266,21 @@ fn run_windows_diagnose(config: DiagnosticConfig) {
                         transition.usage(),
                         action
                     );
+                    if config.send_action && transition.usage() == 0x27 {
+                        if transition.is_pressed() {
+                            println!("[DIAGNOSE-ACTION] Emitting Ctrl+Alt+Shift+P down via SendInput...");
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_down(0x11)); // VK_CONTROL
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_down(0x12)); // VK_MENU (Alt)
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_down(0x10)); // VK_SHIFT
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_down(0x50)); // VK_P
+                        } else {
+                            println!("[DIAGNOSE-ACTION] Emitting Ctrl+Alt+Shift+P up via SendInput...");
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_up(0x50));
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_up(0x10));
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_up(0x12));
+                            let _ = ResidentPlatform::send_keyboard(KeyboardEvent::key_up(0x11));
+                        }
+                    }
                 }
             }
             Ok(None) => {
