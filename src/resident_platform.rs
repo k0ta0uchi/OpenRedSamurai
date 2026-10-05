@@ -915,6 +915,10 @@ pub(crate) fn write_relay_trace(event: &str) {
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    if std::env::var_os("REDSAMURAI_CONSOLE_LOG").is_some() {
+        eprintln!("[DIAGNOSE] {event}");
+    }
+
     let Some(path) = std::env::var_os("REDSAMURAI_RECOVERY_LOG") else {
         return;
     };
@@ -1336,7 +1340,12 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 LegacyKeyboardSample::new(virtual_key, info.scanCode, info.flags.0, info.time);
             let state = LOW_LEVEL_KEYBOARD_STATE.with(|slot| slot.borrow().clone());
             if let Some(state) = state {
-                if state.classify(event) == KeyboardFilterDecision::Suppress {
+                let decision = state.classify(event);
+                write_relay_trace(&format!(
+                    "event=low_level_hook decision={:?} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X}",
+                    decision, event.virtual_key, event.scan_code, event.flags
+                ));
+                if decision == KeyboardFilterDecision::Suppress {
                     return windows::Win32::Foundation::LRESULT(1);
                 }
             }
@@ -2031,6 +2040,7 @@ impl Drop for RawInputReader {
 
 #[cfg(windows)]
 struct RawInputWindowState {
+    raw_expected_path: String,
     expected_path: String,
     sender: std::sync::mpsc::Sender<Result<ButtonTransition, String>>,
     shutdown_requested: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -2311,6 +2321,7 @@ mod relay_echo_tests {
         let (sender, receiver) = std::sync::mpsc::channel();
         let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut state = RawInputWindowState {
+            raw_expected_path: "target".to_owned(),
             expected_path: "target".to_owned(),
             sender,
             shutdown_requested,
@@ -2428,6 +2439,7 @@ fn raw_input_thread(
         }
 
         let mut state = Box::new(RawInputWindowState {
+            raw_expected_path: expected_path.clone(),
             expected_path: normalize_raw_input_device_path(&expected_path),
             sender,
             shutdown_requested: shutdown_requested.clone(),
@@ -2627,7 +2639,7 @@ unsafe extern "system" fn raw_input_window_proc(
             if (*state).relay_state.is_some() {
                 None
             } else {
-                Some(&(*state).expected_path)
+                Some(&(*state).raw_expected_path)
             },
         ) {
             Ok(Some(event)) => {
@@ -2738,6 +2750,19 @@ unsafe extern "system" fn raw_input_window_proc(
                         }
                     }
                 } else {
+                    let branch = if event.is_target_device {
+                        "target_device"
+                    } else {
+                        "non_target_device"
+                    };
+                    write_relay_trace(&format!(
+                        "event=raw_dispatch branch={} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X} edge={}",
+                        branch,
+                        event.sample.virtual_key,
+                        event.sample.scan_code,
+                        event.sample.flags,
+                        if event.sample.is_break() { "break" } else { "make" },
+                    ));
                     if let Some(suppression_state) = (*state).suppression_state.as_ref() {
                         if event.is_target_device {
                             suppression_state.observe_target(event.sample);
@@ -2745,10 +2770,15 @@ unsafe extern "system" fn raw_input_window_proc(
                                 let _ = (*state).sender.send(Ok(transition));
                             }
                         } else {
-                            if suppression_state.is_suppressed_key(
+                            let is_suppressed = suppression_state.is_suppressed_key(
                                 event.sample.virtual_key,
                                 event.sample.scan_code as u32,
-                            ) {
+                            );
+                            write_relay_trace(&format!(
+                                "event=non_target_suppression_check is_suppressed={} vk=0x{:02X} scan=0x{:02X}",
+                                is_suppressed, event.sample.virtual_key, event.sample.scan_code
+                            ));
+                            if is_suppressed {
                                 replay_suppressed_keyboard_sample(event.sample);
                             }
                         }
@@ -3220,13 +3250,6 @@ unsafe fn read_raw_input_event(
                 if trace {
                     eprintln!("raw_input_trace=device_name_unavailable");
                 }
-                if expected_path.is_some() {
-                    return Ok(None);
-                }
-                // A SendInput replay can reappear as a keyboard Raw Input
-                // record without a resolvable hDevice. Keep the packet so
-                // the relay can match it against its pending self-echo
-                // ledger instead of tearing down the whole message loop.
                 ("<unidentified>".to_owned(), String::new(), false)
             }
         };
@@ -3236,6 +3259,10 @@ unsafe fn read_raw_input_event(
         _ => false,
     };
 
+    let norm_expected = expected_path
+        .map(normalize_raw_input_device_path)
+        .unwrap_or_default();
+
     let keyboard_size = std::mem::size_of::<RAWKEYBOARD>();
     if !raw_keyboard_payload_is_sized(copied, header_size, keyboard_size) {
         return Err(format!(
@@ -3244,6 +3271,19 @@ unsafe fn read_raw_input_event(
         ));
     }
     let keyboard = std::ptr::read_unaligned(buffer.as_ptr().add(header_size).cast::<RAWKEYBOARD>());
+
+    write_relay_trace(&format!(
+        "event=raw_device_id raw_path=\"{}\" norm_raw=\"{}\" expected=\"{}\" norm_expected=\"{}\" is_target={} vk=0x{:02X} scan=0x{:02X} edge={}",
+        device_name,
+        normalized_device_name,
+        expected_path.unwrap_or(""),
+        norm_expected,
+        is_target_device,
+        keyboard.VKey,
+        keyboard.MakeCode,
+        if keyboard.Flags & 0x0001 != 0 { "break" } else { "make" }
+    ));
+
     let transition = if is_target_device || expected_path.is_none() {
         map_raw_keyboard_event(keyboard.VKey, keyboard.Flags)
     } else {
@@ -3370,7 +3410,7 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 /// is opt-in through `REDSAMURAI_ENABLE_KEYBOARD_RELAY=1`.
 /// The `initial_suppressed` keys are passed directly to hook creation so
 /// suppression is active from the very first hook callback without a startup race.
-pub(crate) fn open_resident_input_device_for_service(
+pub fn open_resident_input_device_for_service(
     initial_suppressed: &[(u16, u32)],
 ) -> Result<ResidentInputDevice, PlatformError> {
     let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
