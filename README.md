@@ -7,7 +7,7 @@ reviewed boundary.
 
 [日本語 README](README.ja.md) · [Roadmap](ROADMAP.md) · [Verification ledger](VERIFICATION.md)
 
-## v1.0.1 scope
+## v1.0.2 scope
 
 The official-compatible product scope is complete: **17/17 acceptance gates (100%)**.
 The release includes:
@@ -20,6 +20,8 @@ The release includes:
   startup registration;
 - native pass-through for the device's existing keyboard usages;
 - software button actions through the Windows `SendInput` and Core Audio boundaries;
+- Button 16 duplicate suppression and official-compatible user-mode hook boundary (resolves Issue #1);
+- hardware scan code population via `MapVirtualKeyW` for game / DirectInput compatibility;
 - macro recording/playback, combo assignment, microphone mute, DPI controls, and
   UI accessibility identifiers;
 - DPI stage sliders support one 100-DPI wheel step per notch and click-to-edit
@@ -39,8 +41,8 @@ not guessed or silently enabled.
 
 ## Install the release
 
-1. Download `OpenRedSamurai-v1.0.1-windows-x64.zip` from the
-   [v1.0.1 GitHub release](https://github.com/k0ta0uchi/OpenRedSamurai/releases/tag/v1.0.1).
+1. Download `OpenRedSamurai-v1.0.2-windows-x64.zip` from the
+   [v1.0.2 GitHub release](https://github.com/k0ta0uchi/OpenRedSamurai/releases/tag/v1.0.2).
 2. Extract it to a directory you control.
 3. In that directory, run `OpenRedSamurai-Setup.exe` and press **インストール**.
    The installer is a native GUI executable. It uses HKCU only, requires no

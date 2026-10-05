@@ -3,7 +3,7 @@
 英語版は [README.md](README.md) です。リリース手順と検証台帳は
 [ROADMAP.md](ROADMAP.md) / [VERIFICATION.md](VERIFICATION.md) を参照してください。
 
-現在の配布版は **v1.0.1** です。GitHub Releases の Windows x64 zip に含まれる
+現在の配布版は **v1.0.2** です。GitHub Releases の Windows x64 zip に含まれる
 `OpenRedSamurai-Setup.exe` を展開したフォルダーから起動すると、現在のユーザーだけに
 インストールできます（管理者権限不要）。ネイティブGUIなので、PowerShellの実行ポリシー
 変更やバッチファイルは必要ありません。アプリの「情報」タブにある「更新を確認」からも
@@ -28,7 +28,9 @@ RED SAMURAI 16400DPI Gaming Mouse (VID_04D9/PID_FC55) 用の設定ツール — 
 
 **Phase 3/4 (実装済み)**: `MI_01` の9バイト入力を読む常駐ランタイム、デバウンス付き
 ソフトウェア割付・マクロ再生、Windows `SendInput` 境界、通知領域トレイ、`--tray` 自動起動、
-HKCU用の型付きインストール計画、ネイティブRustインストーラーGUI、GitHub更新確認
+HKCU用の型付きインストール計画、ネイティブRustインストーラーGUI、GitHub更新確認、
+Button 16の重複抑止とユーザーモードフック境界（Issue #1 修正）、`MapVirtualKeyW` による
+ゲーム互換用スキャンコード自動補完
 
 DPIタブの各ステージは、スライダー上のホイール1ノッチで100 DPIずつ移動できます。
 表示値をクリックして直接入力することもでき、値は最近傍100 DPI（中央値は切り上げ）へ丸め、

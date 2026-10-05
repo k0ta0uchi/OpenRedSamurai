@@ -6,10 +6,10 @@
 param(
     [Parameter()]
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version = '1.0.1',
+    [string] $Version = '1.0.2',
 
     [Parameter()]
-    [string] $OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'),
+    [string] $OutputDirectory = '',
 
     [Parameter()]
     [switch] $SkipBuild
@@ -18,6 +18,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $OutputDirectory) {
+    $OutputDirectory = Join-Path $repoRoot 'dist'
+}
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 $stageName = "OpenRedSamurai-v$Version-windows-x64"
 $stage = Join-Path $output $stageName
@@ -70,7 +73,8 @@ $files = @(
     @{ Source = (Join-Path $repoRoot 'installer\setup.ps1'); Relative = 'installer\setup.ps1' },
     @{ Source = (Join-Path $repoRoot 'installer\README.md'); Relative = 'installer\README.md' },
     @{ Source = (Join-Path $repoRoot 'setup.ps1'); Relative = 'setup.ps1' },
-    @{ Source = (Join-Path $repoRoot 'setup.cmd'); Relative = 'setup.cmd' }
+    @{ Source = (Join-Path $repoRoot 'setup.cmd'); Relative = 'setup.cmd' },
+    @{ Source = (Join-Path $repoRoot 'register-task.ps1'); Relative = 'register-task.ps1' }
 )
 
 foreach ($file in $files) {
