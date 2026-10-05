@@ -2204,7 +2204,7 @@ impl RawInputRelayState {
         Self {
             core,
             hook_state,
-            active: false,
+            active: !observe_only,
             probe_arm: None,
             observe_only,
         }
@@ -2484,7 +2484,11 @@ fn raw_input_thread(
                 usUsagePage: keyboard_relay_windows::KEYBOARD_USAGE_PAGE,
                 usUsage: keyboard_relay_windows::KEYBOARD_USAGE,
                 dwFlags: windows::Win32::UI::Input::RAWINPUTDEVICE_FLAGS(
-                    keyboard_relay_windows::RAW_INPUT_PROBE_REGISTER_FLAGS,
+                    if observe_only {
+                        keyboard_relay_windows::RAW_INPUT_PROBE_REGISTER_FLAGS
+                    } else {
+                        keyboard_relay_windows::RAW_INPUT_REGISTER_FLAGS
+                    },
                 ),
                 hwndTarget: hwnd,
             }
@@ -2505,10 +2509,10 @@ fn raw_input_thread(
         }
         if state.relay_state.is_some() {
             write_relay_trace(&format!(
-                "event=keyboard_relay_probe_registered usage_page=0x{:04X} usage=0x{:04X} flags=0x{:04X}",
+                "event=keyboard_relay_registered usage_page=0x{:04X} usage=0x{:04X} flags=0x{:04X}",
                 keyboard_relay_windows::KEYBOARD_USAGE_PAGE,
                 keyboard_relay_windows::KEYBOARD_USAGE,
-                keyboard_relay_windows::RAW_INPUT_PROBE_REGISTER_FLAGS
+                raw_device.dwFlags.0
             ));
         }
 
@@ -2636,11 +2640,7 @@ unsafe extern "system" fn raw_input_window_proc(
     if message == WM_INPUT && !state.is_null() {
         match read_raw_input_event(
             windows::Win32::UI::Input::HRAWINPUT(lparam.0 as *mut std::ffi::c_void),
-            if (*state).relay_state.is_some() {
-                None
-            } else {
-                Some(&(*state).raw_expected_path)
-            },
+            Some(&(*state).raw_expected_path),
         ) {
             Ok(Some(event)) => {
                 if (*state).relay_state.is_some() {
@@ -3413,12 +3413,12 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 pub fn open_resident_input_device_for_service(
     initial_suppressed: &[(u16, u32)],
 ) -> Result<ResidentInputDevice, PlatformError> {
-    let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
-    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
-    let suppression_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION")
+    let relay_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_RELAY")
         .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false);
-    let suppress_legacy = !all_keyboard_relay && !suppression_disabled;
+    let all_keyboard_relay = !relay_disabled;
+    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
+    let suppress_legacy = !all_keyboard_relay;
     open_resident_input_device_internal(
         suppress_legacy,
         all_keyboard_relay,

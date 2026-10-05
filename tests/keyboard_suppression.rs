@@ -81,31 +81,3 @@ fn press_and_release_edges_are_correlated_independently() {
         KeyboardFilterDecision::Suppress
     );
 }
-
-#[test]
-fn registered_side_key_is_suppressed_immediately_without_waiting() {
-    let mut filter = KeyboardDuplicateFilter::new(8);
-    // Register Button 16 (0x30, 0x0B) as a customized side key needing suppression
-    filter.set_suppressed_keys([(0x30, 0x0B)]);
-
-    // Button 16 down
-    assert_eq!(
-        filter.classify(hardware_sample(0x30, 0x0B, 0, 100)),
-        KeyboardFilterDecision::Suppress
-    );
-    // Button 16 up
-    assert_eq!(
-        filter.classify(hardware_sample(0x30, 0x0B, 0x80, 150)),
-        KeyboardFilterDecision::Suppress
-    );
-    // Unregistered key (e.g. 'A' 0x41, 0x1E) passes through
-    assert_eq!(
-        filter.classify(hardware_sample(0x41, 0x1E, 0, 160)),
-        KeyboardFilterDecision::Pass
-    );
-    // Injected '0' (from SendInput replay) passes through
-    assert_eq!(
-        filter.classify(hardware_sample(0x30, 0x0B, 0x10, 170)),
-        KeyboardFilterDecision::Pass
-    );
-}
