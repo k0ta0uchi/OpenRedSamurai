@@ -957,12 +957,23 @@ fn send_windows_keyboard_event(event: KeyboardEvent) -> Result<(), PlatformError
         ));
     }
 
+    let scan_code = if event.scan_code != 0 {
+        event.scan_code
+    } else {
+        unsafe {
+            windows::Win32::UI::Input::KeyboardAndMouse::MapVirtualKeyW(
+                event.virtual_key as u32,
+                windows::Win32::UI::Input::KeyboardAndMouse::MAPVK_VK_TO_VSC,
+            ) as u16
+        }
+    };
+
     let input = INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: VIRTUAL_KEY(event.virtual_key),
-                wScan: event.scan_code,
+                wScan: scan_code,
                 dwFlags: KEYBD_EVENT_FLAGS(event.flags),
                 time: 0,
                 dwExtraInfo: extra_info,
