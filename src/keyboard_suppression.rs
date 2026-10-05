@@ -152,8 +152,13 @@ impl KeyboardDuplicateFilter {
             return KeyboardFilterDecision::Pass;
         }
 
+        // Custom suppressed keys (like Button 16) pass through the low-level hook
+        // so that Windows creates WM_INPUT (Raw Input). The Raw Input window proc
+        // will then definitively identify whether it originated from the RED SAMURAI
+        // device (which cancels the hardware character and emits the button transition)
+        // or a physical keyboard (which passes through untouched).
         if self.is_suppressed_key(event.virtual_key, event.scan_code) {
-            return KeyboardFilterDecision::Suppress;
+            return KeyboardFilterDecision::Pass;
         }
 
         self.prune(event.timestamp_ms);

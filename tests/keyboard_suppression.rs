@@ -83,22 +83,24 @@ fn press_and_release_edges_are_correlated_independently() {
 }
 
 #[test]
-fn registered_suppressed_keys_are_suppressed_immediately() {
+fn registered_suppressed_keys_pass_hook_for_raw_input_disambiguation() {
     let mut filter = KeyboardDuplicateFilter::new(8);
     // Button 16 factory key: VK=0x30 ('0'), ScanCode=0x0B
     filter.set_suppressed_keys([(0x30, 0x0B)]);
 
-    // Down edge is suppressed immediately without target observation
+    assert!(filter.is_suppressed_key(0x30, 0x0B));
+
+    // Low-level hook passes the key through so Windows creates WM_INPUT (Raw Input).
+    // The Raw Input window proc disambiguates the device and cancels target hardware keys.
     assert_eq!(
         filter.classify(hardware_sample(0x30, 0x0B, 0, 100)),
-        KeyboardFilterDecision::Suppress
+        KeyboardFilterDecision::Pass
     );
-    // Up edge is also suppressed immediately
     assert_eq!(
         filter.classify(hardware_sample(0x30, 0x0B, 0x80, 110)),
-        KeyboardFilterDecision::Suppress
+        KeyboardFilterDecision::Pass
     );
-    // Injected events are not suppressed
+    // Injected events are also not suppressed
     assert_eq!(
         filter.classify(hardware_sample(0x30, 0x0B, 0x10, 120)),
         KeyboardFilterDecision::Pass
