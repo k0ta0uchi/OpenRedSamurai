@@ -1114,85 +1114,43 @@ impl KeyboardDuplicateState {
         self.wake.notify_all();
     }
 
+    fn set_suppressed_keys(&self, keys: impl IntoIterator<Item = (u16, u32)>) {
+        let mut filter = match self.filter.lock() {
+            Ok(filter) => filter,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        filter.set_suppressed_keys(keys);
+    }
+
+    fn is_suppressed_key(&self, virtual_key: u16, scan_code: u32) -> bool {
+        let filter = match self.filter.lock() {
+            Ok(filter) => filter,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        filter.is_suppressed_key(virtual_key, scan_code)
+    }
+
     fn classify(
         &self,
         event: crate::keyboard_suppression::LegacyKeyboardSample,
     ) -> crate::keyboard_suppression::KeyboardFilterDecision {
-        use crate::keyboard_suppression::{KeyboardFilterDecision, LOW_LEVEL_KEY_INJECTED};
-
-        let injected = event.flags & LOW_LEVEL_KEY_INJECTED != 0;
-        let deadline = std::time::Instant::now().checked_add(std::time::Duration::from_millis(8));
         let mut filter = match self.filter.lock() {
             Ok(filter) => filter,
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        loop {
-            let decision = filter.classify(event);
-            if injected || decision == KeyboardFilterDecision::Suppress {
-                self.trace(format!(
-                    "event=legacy_classify vk=0x{:02X} scan=0x{:02X} flags=0x{:08X} time={} injected={} decision={:?} pending={}",
-                    event.virtual_key,
-                    event.scan_code,
-                    event.flags,
-                    event.timestamp_ms,
-                    injected,
-                    decision,
-                    filter.pending_len()
-                ));
-                return decision;
-            }
-
-            let Some(deadline) = deadline else {
-                return KeyboardFilterDecision::Pass;
-            };
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            if remaining.is_zero() {
-                self.trace(format!(
-                    "event=legacy_classify vk=0x{:02X} scan=0x{:02X} flags=0x{:08X} time={} injected={} decision=PassTimeout pending={}",
-                    event.virtual_key,
-                    event.scan_code,
-                    event.flags,
-                    event.timestamp_ms,
-                    injected,
-                    filter.pending_len()
-                ));
-                return KeyboardFilterDecision::Pass;
-            }
-            let waited = self.wake.wait_timeout(filter, remaining);
-            match waited {
-                Ok((next, result)) => {
-                    filter = next;
-                    if result.timed_out() {
-                        self.trace(format!(
-                            "event=legacy_classify vk=0x{:02X} scan=0x{:02X} flags=0x{:08X} time={} injected={} decision=PassWaitTimeout pending={}",
-                            event.virtual_key,
-                            event.scan_code,
-                            event.flags,
-                            event.timestamp_ms,
-                            injected,
-                            filter.pending_len()
-                        ));
-                        return KeyboardFilterDecision::Pass;
-                    }
-                }
-                Err(poisoned) => {
-                    let (mut next, _) = poisoned.into_inner();
-                    let decision = next.classify(event);
-                    self.trace(format!(
-                        "event=legacy_classify vk=0x{:02X} scan=0x{:02X} flags=0x{:08X} time={} injected={} decision={:?} pending={}",
-                        event.virtual_key,
-                        event.scan_code,
-                        event.flags,
-                        event.timestamp_ms,
-                        injected,
-                        decision,
-                        next.pending_len()
-                    ));
-                    return decision;
-                }
-            }
-        }
+        let decision = filter.classify(event);
+        self.trace(format!(
+            "event=legacy_classify vk=0x{:02X} scan=0x{:02X} flags=0x{:08X} time={} injected={} decision={:?} pending={}",
+            event.virtual_key,
+            event.scan_code,
+            event.flags,
+            event.timestamp_ms,
+            event.is_injected(),
+            decision,
+            filter.pending_len()
+        ));
+        decision
     }
 
     fn trace(&self, message: String) {
@@ -2039,6 +1997,12 @@ impl RawInputReader {
         }
         receive_raw_input_transition(&self.receiver, timeout_ms)
     }
+
+    fn update_suppressed_keys(&self, keys: &[(u16, u32)]) {
+        if let Some(state) = self.suppression_state.as_ref() {
+            state.set_suppressed_keys(keys.iter().copied());
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -2349,6 +2313,7 @@ mod relay_echo_tests {
         };
         let relay_sample = keyboard_relay::RawKeyboardSample::new("target", 0x31, 0x1E, 0, 0);
         let event = RawInputKeyboardEvent {
+            is_target_device: true,
             transition: Some(ButtonTransition::pressed(0x1E)),
             sample: crate::keyboard_suppression::RawKeyboardSample::new(0x31, 0x1E, 0, 0),
             relay_sample,
@@ -2768,10 +2733,23 @@ unsafe extern "system" fn raw_input_window_proc(
                     }
                 } else {
                     if let Some(suppression_state) = (*state).suppression_state.as_ref() {
-                        suppression_state.observe_target(event.sample);
-                    }
-                    if let Some(transition) = event.transition {
-                        let _ = (*state).sender.send(Ok(transition));
+                        if event.is_target_device {
+                            suppression_state.observe_target(event.sample);
+                            if let Some(transition) = event.transition {
+                                let _ = (*state).sender.send(Ok(transition));
+                            }
+                        } else {
+                            if suppression_state.is_suppressed_key(
+                                event.sample.virtual_key,
+                                event.sample.scan_code as u32,
+                            ) {
+                                replay_suppressed_keyboard_sample(event.sample);
+                            }
+                        }
+                    } else if event.is_target_device {
+                        if let Some(transition) = event.transition {
+                            let _ = (*state).sender.send(Ok(transition));
+                        }
                     }
                 }
             }
@@ -3116,7 +3094,49 @@ pub(crate) fn raw_keyboard_payload_is_sized(
 }
 
 #[cfg(windows)]
+fn replay_suppressed_keyboard_sample(sample: crate::keyboard_suppression::RawKeyboardSample) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    };
+
+    let mut dw_flags = 0u32;
+    if sample.is_break() {
+        dw_flags |= KEYEVENTF_KEYUP.0;
+    }
+    if sample.is_extended() {
+        dw_flags |= KEYEVENTF_EXTENDEDKEY.0;
+    }
+
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(sample.virtual_key),
+                wScan: sample.scan_code,
+                dwFlags: KEYBD_EVENT_FLAGS(dw_flags),
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+
+    write_relay_trace(&format!(
+        "event=replay_suppressed_key vk=0x{:02X} scan=0x{:02X} flags=0x{:04X} edge={}",
+        sample.virtual_key,
+        sample.scan_code,
+        sample.flags,
+        if sample.is_break() { "up" } else { "down" }
+    ));
+
+    unsafe {
+        let _ = SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(windows)]
 struct RawInputKeyboardEvent {
+    is_target_device: bool,
     transition: Option<ButtonTransition>,
     sample: crate::keyboard_suppression::RawKeyboardSample,
     relay_sample: keyboard_relay::RawKeyboardSample,
@@ -3185,17 +3205,6 @@ unsafe fn read_raw_input_event(
         match raw_input_device_name(header.hDevice) {
             Some(device_name) => {
                 let normalized_device_name = normalize_raw_input_device_path(&device_name);
-                if let Some(expected_path) = expected_path {
-                    if !raw_input_device_path_matches(expected_path, &device_name) {
-                        if trace {
-                            eprintln!(
-                                "raw_input_trace=path_mismatch observed={:?} expected={:?}",
-                                device_name, expected_path
-                            );
-                        }
-                        return Ok(None);
-                    }
-                }
                 (device_name, normalized_device_name, true)
             }
             None => {
@@ -3213,6 +3222,11 @@ unsafe fn read_raw_input_event(
             }
         };
 
+    let is_target_device = match (&device_name, expected_path) {
+        (name, Some(expected)) => raw_input_device_path_matches(expected, name),
+        _ => false,
+    };
+
     let keyboard_size = std::mem::size_of::<RAWKEYBOARD>();
     if !raw_keyboard_payload_is_sized(copied, header_size, keyboard_size) {
         return Err(format!(
@@ -3221,7 +3235,11 @@ unsafe fn read_raw_input_event(
         ));
     }
     let keyboard = std::ptr::read_unaligned(buffer.as_ptr().add(header_size).cast::<RAWKEYBOARD>());
-    let transition = map_raw_keyboard_event(keyboard.VKey, keyboard.Flags);
+    let transition = if is_target_device || expected_path.is_none() {
+        map_raw_keyboard_event(keyboard.VKey, keyboard.Flags)
+    } else {
+        None
+    };
     let sample = crate::keyboard_suppression::RawKeyboardSample::new(
         keyboard.VKey,
         keyboard.MakeCode,
@@ -3247,6 +3265,7 @@ unsafe fn read_raw_input_event(
         );
     }
     Ok(Some(RawInputKeyboardEvent {
+        is_target_device,
         transition,
         sample,
         relay_sample,
@@ -3316,6 +3335,12 @@ impl ResidentInputDevice {
             .read_transition(timeout_ms)
             .map(|transition| transition.map(|transition| vec![transition]))
     }
+
+    /// Update the set of (virtual_key, scan_code) pairs that should be suppressed
+    /// from foreground delivery (e.g. customized side-button hardware keys).
+    pub fn update_suppressed_keys(&self, keys: &[(u16, u32)]) {
+        self.reader.update_suppressed_keys(keys);
+    }
 }
 
 #[cfg(windows)]
@@ -3330,34 +3355,19 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 #[cfg(windows)]
 /// Open the resident collection for the long-lived service.
 ///
-/// The diagnostic all-keyboard relay is deliberately opt-in through
-/// `REDSAMURAI_ENABLE_KEYBOARD_RELAY=1`. It is the only service mode that
-/// registers `RIDEV_NOLEGACY`; the normal service remains read-only for the
-/// exact target collection. The rejected device-specific correlation hook is
-/// still available separately through
-/// `REDSAMURAI_ENABLE_KEYBOARD_SUPPRESSION_EXPERIMENTAL=1` for diagnostics,
-/// but cannot be combined with the relay. The all-keyboard relay itself uses
-/// registration-only Raw Input and marked `SendInput` replay by default; the
-/// separate `REDSAMURAI_ENABLE_KEYBOARD_RELAY_GATE=1` switch is required for
-/// the experimental low-level suppression gate. The validation-only
-/// `REDSAMURAI_KEYBOARD_RELAY_OBSERVE_ONLY=1` switch keeps the legacy-safe
-/// registration and records events without replay or actions. Read-only probes
-/// must use [`open_resident_input_device`] so merely observing the collection
-/// never changes foreground keyboard delivery.
+/// Foreground keyboard suppression for customized side keys is enabled by
+/// default for the service unless `REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION=1`
+/// is set or all-keyboard relay is active. The diagnostic all-keyboard relay
+/// is opt-in through `REDSAMURAI_ENABLE_KEYBOARD_RELAY=1`.
 pub(crate) fn open_resident_input_device_for_service() -> Result<ResidentInputDevice, PlatformError>
 {
     let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
     let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
-    let experimental = std::env::var("REDSAMURAI_ENABLE_KEYBOARD_SUPPRESSION_EXPERIMENTAL")
+    let suppression_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION")
         .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false);
-    if all_keyboard_relay && experimental {
-        return Err(PlatformError::InputOpen {
-            message: "all-keyboard relay cannot be combined with experimental keyboard suppression"
-                .to_owned(),
-        });
-    }
-    open_resident_input_device_internal(experimental, all_keyboard_relay, observe_only)
+    let suppress_legacy = !all_keyboard_relay && !suppression_disabled;
+    open_resident_input_device_internal(suppress_legacy, all_keyboard_relay, observe_only)
 }
 
 #[cfg(windows)]
