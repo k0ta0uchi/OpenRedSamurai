@@ -362,20 +362,29 @@ fn run_device_session<'a>(
     reconnect: bool,
     recovery_log: Option<&std::path::Path>,
 ) -> Result<(), ResidentServiceError> {
+    let initial_suppressed = compute_suppressed_side_keys(runtime);
+    write_recovery_trace(
+        recovery_log,
+        &format!(
+            "event=initial_suppressed_keys count={}",
+            initial_suppressed.len()
+        ),
+    );
     write_recovery_trace(recovery_log, "event=input_open_start");
-    let mut device = match resident_platform::open_resident_input_device_for_service() {
-        Ok(device) => {
-            write_recovery_trace(recovery_log, "event=input_open_ok");
-            device
-        }
-        Err(error) => {
-            write_recovery_trace(
-                recovery_log,
-                &format!("event=input_open_error error={error}"),
-            );
-            return Err(error.into());
-        }
-    };
+    let mut device =
+        match resident_platform::open_resident_input_device_for_service(&initial_suppressed) {
+            Ok(device) => {
+                write_recovery_trace(recovery_log, "event=input_open_ok");
+                device
+            }
+            Err(error) => {
+                write_recovery_trace(
+                    recovery_log,
+                    &format!("event=input_open_error error={error}"),
+                );
+                return Err(error.into());
+            }
+        };
     if reconnect {
         reapply_rust_owned_configuration(profiles, control, stop, recovery_log);
     }
@@ -417,13 +426,23 @@ fn run_device_session<'a>(
             runtime
                 .tick(now_ms)
                 .map_err(|error| ResidentServiceError::Sink(error.to_string()))?;
-            switch_profile_if_requested(
+            if switch_profile_if_requested(
                 runtime,
                 profiles,
                 macros,
                 control,
                 &mut native_passthrough,
-            )?;
+            )? {
+                let suppressed_keys = compute_suppressed_side_keys(runtime);
+                write_recovery_trace(
+                    recovery_log,
+                    &format!(
+                        "event=update_suppressed_keys count={}",
+                        suppressed_keys.len()
+                    ),
+                );
+                device.update_suppressed_keys(&suppressed_keys);
+            }
         } else {
             if stop.load(Ordering::Acquire) {
                 break;
@@ -432,13 +451,23 @@ fn run_device_session<'a>(
             runtime
                 .tick(now_ms)
                 .map_err(|error| ResidentServiceError::Sink(error.to_string()))?;
-            switch_profile_if_requested(
+            if switch_profile_if_requested(
                 runtime,
                 profiles,
                 macros,
                 control,
                 &mut native_passthrough,
-            )?;
+            )? {
+                let suppressed_keys = compute_suppressed_side_keys(runtime);
+                write_recovery_trace(
+                    recovery_log,
+                    &format!(
+                        "event=update_suppressed_keys count={}",
+                        suppressed_keys.len()
+                    ),
+                );
+                device.update_suppressed_keys(&suppressed_keys);
+            }
         }
     }
     Ok(())
@@ -607,6 +636,35 @@ impl NativeKeyboardPassthrough {
     }
 }
 
+pub use crate::resident_platform::SIDE_BUTTON_FACTORY_KEYS;
+
+/// Compute the list of (virtual_key, scan_code) pairs that should be suppressed
+/// by the low-level keyboard hook because their factory side-button key has been
+/// customized (remapped, assigned to a macro, disabled, etc.) instead of native passthrough.
+pub fn compute_suppressed_side_keys<S: crate::resident::InputSink>(
+    runtime: &crate::resident::ResidentRuntime<'_, S>,
+) -> Vec<(u16, u32)> {
+    let mut suppressed = Vec::new();
+    for &(button, factory_usage, vk, scan) in SIDE_BUTTON_FACTORY_KEYS {
+        let is_native_passthrough = matches!(
+            runtime.resolver().resolve(button),
+            Some(crate::resident::Action::Keyboard {
+                usage,
+                modifiers,
+            }) if NativeKeyboardPassthrough::native_usage_matches(button, factory_usage, usage)
+                && modifiers == crate::resident::Modifiers::NONE
+        );
+        if !is_native_passthrough {
+            suppressed.push((vk, scan));
+            if button == 18 {
+                // Button 18 alias reports 0x33 (VK 0xBA, scan 0x28)
+                suppressed.push((0xBA, 0x28));
+            }
+        }
+    }
+    suppressed
+}
+
 #[cfg(windows)]
 fn feed_transition<S: crate::resident::InputSink<Error = PlatformError>>(
     runtime: &mut crate::resident::ResidentRuntime<'_, S>,
@@ -633,6 +691,20 @@ fn feed_transition<S: crate::resident::InputSink<Error = PlatformError>>(
         );
         return Ok(());
     }
+    write_recovery_trace(
+        recovery_trace_path().as_deref(),
+        &format!(
+            "event=feed_custom_transition button={} usage=0x{:02X} edge={} time={}",
+            button,
+            transition.usage(),
+            if transition.is_pressed() {
+                "press"
+            } else {
+                "release"
+            },
+            timestamp_ms,
+        ),
+    );
     runtime
         .handle(crate::resident::ButtonEvent::new(
             button,
@@ -760,11 +832,11 @@ fn switch_profile_if_requested<'a>(
     macros: &'a crate::macro_db::MacroDb,
     control: &Arc<ResidentControl>,
     native_passthrough: &mut NativeKeyboardPassthrough,
-) -> Result<(), ResidentServiceError> {
+) -> Result<bool, ResidentServiceError> {
     let requested = control.requested_profile.load(Ordering::Acquire);
     let active = control.active_profile.load(Ordering::Acquire);
     if requested == active || requested >= profiles.len() {
-        return Ok(());
+        return Ok(false);
     }
     runtime
         .reset()
@@ -780,7 +852,7 @@ fn switch_profile_if_requested<'a>(
     );
     let old = std::mem::replace(runtime, replacement);
     drop(old);
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(windows)]
@@ -808,6 +880,13 @@ fn send_keyboard_sequence<F>(
 where
     F: FnMut(resident_platform::KeyboardEvent) -> Result<(), PlatformError>,
 {
+    write_recovery_trace(
+        recovery_trace_path().as_deref(),
+        &format!(
+            "event=send_keyboard_sequence vk=0x{:02X} modifiers={:?} phase={:?}",
+            virtual_key, modifier_keys, phase
+        ),
+    );
     match phase {
         crate::resident::ActionPhase::Down | crate::resident::ActionPhase::Trigger => {
             let mut sent_modifiers = Vec::with_capacity(modifier_keys.len());
@@ -1310,6 +1389,92 @@ mod tests {
                 "factory SIDE {button} ledger must close on release"
             );
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn button_16_factory_is_not_suppressed() {
+        let profile = crate::profile::Profile::default_profile(1);
+        let macros = crate::macro_db::MacroDb::default();
+        let runtime = ResidentRuntime::new(&profile, &macros, PlatformRecordingSink::default());
+        let suppressed = compute_suppressed_side_keys(&runtime);
+        // Factory profile has all 12 buttons as factory single-keys, so none are suppressed
+        assert!(!suppressed.iter().any(|&(vk, _)| vk == 0x30));
+        assert!(suppressed.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn button_16_custom_ctrl_alt_shift_p_is_suppressed_and_emits_custom_action() {
+        let mut profile = crate::profile::Profile::default_profile(1);
+        // Button 16: Assign Ctrl+Alt+Shift+P (P = usage 0x13, VK 0x50)
+        profile.set_button_combo(16, 0x13, 0x01 | 0x02 | 0x04);
+        let macros = crate::macro_db::MacroDb::default();
+        let mut runtime =
+            ResidentRuntime::with_debounce(&profile, &macros, PlatformRecordingSink::default(), 0);
+        let suppressed = compute_suppressed_side_keys(&runtime);
+        // Button 16 factory key (0x30, 0x0B) must be suppressed!
+        assert!(suppressed.iter().any(|&(vk, scan)| vk == 0x30 && scan == 0x0B));
+
+        // When Button 16 is pressed, it must not passthrough
+        let mut passthrough = NativeKeyboardPassthrough::default();
+        feed_transition(
+            &mut runtime,
+            &mut passthrough,
+            ButtonTransition::pressed(0x27),
+            0,
+        )
+        .expect("press should dispatch");
+        assert!(!passthrough.is_held(16));
+        // Action event should be emitted
+        assert_eq!(runtime.sink().events.len(), 1);
+        assert_eq!(
+            runtime.sink().events[0],
+            ActionEvent {
+                action: crate::resident::Action::Keyboard {
+                    usage: 0x13,
+                    modifiers: crate::resident::Modifiers::CTRL
+                        | crate::resident::Modifiers::SHIFT
+                        | crate::resident::Modifiers::ALT,
+                },
+                phase: ActionPhase::Down,
+            }
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn button_16_custom_single_key_p_is_suppressed_and_emits_p() {
+        let mut profile = crate::profile::Profile::default_profile(1);
+        // Button 16: Assign single key 'P' (usage 0x13, VK 0x50)
+        profile.set_button_single_key_usage(16, 0x13);
+        let macros = crate::macro_db::MacroDb::default();
+        let mut runtime =
+            ResidentRuntime::with_debounce(&profile, &macros, PlatformRecordingSink::default(), 0);
+        let suppressed = compute_suppressed_side_keys(&runtime);
+        // Button 16 factory key (0x30, 0x0B) must be suppressed!
+        assert!(suppressed.iter().any(|&(vk, scan)| vk == 0x30 && scan == 0x0B));
+
+        let mut passthrough = NativeKeyboardPassthrough::default();
+        feed_transition(
+            &mut runtime,
+            &mut passthrough,
+            ButtonTransition::pressed(0x27),
+            0,
+        )
+        .expect("press should dispatch");
+        assert!(!passthrough.is_held(16));
+        assert_eq!(runtime.sink().events.len(), 1);
+        assert_eq!(
+            runtime.sink().events[0],
+            ActionEvent {
+                action: crate::resident::Action::Keyboard {
+                    usage: 0x13,
+                    modifiers: crate::resident::Modifiers::NONE,
+                },
+                phase: ActionPhase::Down,
+            }
+        );
     }
 
     #[cfg(windows)]

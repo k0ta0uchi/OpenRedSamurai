@@ -43,11 +43,11 @@ impl RawKeyboardSample {
         }
     }
 
-    const fn is_break(self) -> bool {
+    pub const fn is_break(self) -> bool {
         self.flags & RAW_KEY_BREAK != 0
     }
 
-    const fn is_extended(self) -> bool {
+    pub const fn is_extended(self) -> bool {
         self.flags & (RAW_KEY_E0 | RAW_KEY_E1) != 0
     }
 }
@@ -72,15 +72,15 @@ impl LegacyKeyboardSample {
         }
     }
 
-    const fn is_break(self) -> bool {
+    pub const fn is_break(self) -> bool {
         self.flags & LOW_LEVEL_KEY_UP != 0
     }
 
-    const fn is_injected(self) -> bool {
+    pub const fn is_injected(self) -> bool {
         self.flags & LOW_LEVEL_KEY_INJECTED != 0
     }
 
-    const fn is_extended(self) -> bool {
+    pub const fn is_extended(self) -> bool {
         self.flags & LOW_LEVEL_KEY_EXTENDED != 0
     }
 }
@@ -99,6 +99,7 @@ pub enum KeyboardFilterDecision {
 pub struct KeyboardDuplicateFilter {
     match_window_ms: u32,
     pending: VecDeque<RawKeyboardSample>,
+    suppressed_keys: Vec<(u16, u32)>,
 }
 
 impl Default for KeyboardDuplicateFilter {
@@ -118,7 +119,21 @@ impl KeyboardDuplicateFilter {
         Self {
             match_window_ms,
             pending: VecDeque::new(),
+            suppressed_keys: Vec::new(),
         }
+    }
+
+    /// Update the set of (virtual_key, scan_code) pairs that represent customized
+    /// side keys and should be suppressed immediately from legacy foreground delivery.
+    pub fn set_suppressed_keys(&mut self, keys: impl IntoIterator<Item = (u16, u32)>) {
+        self.suppressed_keys = keys.into_iter().collect();
+    }
+
+    /// Check if a (virtual_key, scan_code) matches a registered customized side key.
+    pub fn is_suppressed_key(&self, virtual_key: u16, scan_code: u32) -> bool {
+        self.suppressed_keys.iter().any(|&(vk, scan)| {
+            vk == virtual_key && (scan == 0 || scan == scan_code || scan_code == 0)
+        })
     }
 
     /// Record one edge from the exact target Raw Input collection.
@@ -130,13 +145,17 @@ impl KeyboardDuplicateFilter {
     }
 
     /// Classify one low-level hook event. Injected events always pass through;
-    /// a hardware event is suppressed only after an exact target observation
-    /// (key, scan code, direction, extended bit, and bounded timestamp) is
-    /// consumed.
+    /// customized side-key events are suppressed immediately; other hardware
+    /// events are suppressed only after an exact target observation is consumed.
     pub fn classify(&mut self, event: LegacyKeyboardSample) -> KeyboardFilterDecision {
         if event.is_injected() {
             return KeyboardFilterDecision::Pass;
         }
+
+        if self.is_suppressed_key(event.virtual_key, event.scan_code) {
+            return KeyboardFilterDecision::Suppress;
+        }
+
         self.prune(event.timestamp_ms);
 
         let Some(index) = self.pending.iter().position(|raw| {

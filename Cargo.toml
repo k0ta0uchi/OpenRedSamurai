@@ -9,6 +9,10 @@ license = "MIT"
 name = "OpenRedSamurai-Setup"
 path = "src/bin/installer.rs"
 
+[[bin]]
+name = "redsamurai-diagnose"
+path = "src/bin/diagnose.rs"
+
 [features]
 # Keep AccessKit enabled in normal builds so stable AuthorId values reach
 # Windows UI Automation.  The feature can be disabled by embedders that do not

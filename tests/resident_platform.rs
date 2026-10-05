@@ -54,9 +54,12 @@ fn relay_trace_lines_remain_intact_when_threads_log_together() {
     std::env::remove_var("REDSAMURAI_RECOVERY_LOG");
 
     let contents = std::fs::read_to_string(&path).expect("trace log must be readable");
-    let lines = contents.lines().collect::<Vec<_>>();
-    assert_eq!(lines.len(), 32, "each event must occupy one complete line");
-    assert!(lines.iter().all(|line| {
+    let test_lines = contents
+        .lines()
+        .filter(|line| line.contains(" event=trace_test index="))
+        .collect::<Vec<_>>();
+    assert_eq!(test_lines.len(), 32, "each event must occupy one complete line");
+    assert!(test_lines.iter().all(|line| {
         line.starts_with("timestamp_ms=")
             && line.contains(" event=trace_test index=")
             && line.ends_with(&"x".repeat(256))
