@@ -1114,7 +1114,6 @@ struct KeyboardDuplicateState {
     hook_alive: std::sync::atomic::AtomicBool,
     hook_error: std::sync::Mutex<Option<String>>,
     trace: std::sync::Mutex<Option<std::fs::File>>,
-    event_sender: std::sync::Mutex<Option<std::sync::mpsc::Sender<Result<ButtonTransition, String>>>>,
 }
 
 #[cfg(windows)]
@@ -1138,26 +1137,7 @@ impl KeyboardDuplicateState {
                         .ok()
                 }),
             ),
-            event_sender: std::sync::Mutex::new(None),
         })
-    }
-
-    fn set_event_sender(&self, sender: std::sync::mpsc::Sender<Result<ButtonTransition, String>>) {
-        let mut slot = match self.event_sender.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        *slot = Some(sender);
-    }
-
-    fn emit_suppressed_transition(&self, transition: ButtonTransition) {
-        let slot = match self.event_sender.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if let Some(sender) = slot.as_ref() {
-            let _ = sender.send(Ok(transition));
-        }
     }
 
     fn observe_target(&self, sample: crate::keyboard_suppression::RawKeyboardSample) {
@@ -1399,35 +1379,12 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 LegacyKeyboardSample::new(virtual_key, info.scanCode, info.flags.0, info.time);
             let state = LOW_LEVEL_KEYBOARD_STATE.with(|slot| slot.borrow().clone());
             if let Some(state) = state {
-                let is_custom_suppressed =
-                    state.is_suppressed_key(event.virtual_key, event.scan_code);
                 let decision = state.classify(event);
                 write_relay_trace(&format!(
                     "event=low_level_hook decision={:?} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X}",
                     decision, event.virtual_key, event.scan_code, event.flags
                 ));
                 if decision == KeyboardFilterDecision::Suppress {
-                    if is_custom_suppressed {
-                        if let Some(usage) =
-                            side_button_usage_from_vk_scan(event.virtual_key, event.scan_code)
-                        {
-                            let transition = if event.is_break() {
-                                ButtonTransition::released(usage)
-                            } else {
-                                ButtonTransition::pressed(usage)
-                            };
-                            write_relay_trace(&format!(
-                                "event=suppressed_button_transition usage=0x{:02X} edge={}",
-                                usage,
-                                if transition.is_pressed() {
-                                    "press"
-                                } else {
-                                    "release"
-                                }
-                            ));
-                            state.emit_suppressed_transition(transition);
-                        }
-                    }
                     return windows::Win32::Foundation::LRESULT(1);
                 }
             }
@@ -1965,7 +1922,6 @@ impl RawInputReader {
         let shutdown_requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (suppression_hook, suppression_state) = if suppress_legacy {
             let state = KeyboardDuplicateState::new(initial_suppressed);
-            state.set_event_sender(event_sender.clone());
             let hook = KeyboardSuppressionHook::new(state.clone(), shutdown_requested.clone())?;
             (Some(hook), Some(state))
         } else {
@@ -2418,6 +2374,7 @@ mod relay_echo_tests {
             sample: crate::keyboard_suppression::RawKeyboardSample::new(0x31, 0x1E, 0, 0),
             relay_sample,
             device_identity_available: true,
+            extra_info: 0,
         };
 
         assert!(relay_handle_raw_event(&mut state, event).is_ok());
@@ -2854,20 +2811,21 @@ unsafe extern "system" fn raw_input_window_proc(
                             );
                             if !is_suppressed {
                                 suppression_state.observe_target(event.sample);
-                                if let Some(transition) = event.transition {
-                                    let _ = (*state).sender.send(Ok(transition));
-                                }
+                            }
+                            if let Some(transition) = event.transition {
+                                let _ = (*state).sender.send(Ok(transition));
                             }
                         } else {
                             let is_suppressed = suppression_state.is_suppressed_key(
                                 event.sample.virtual_key,
                                 event.sample.scan_code as u32,
                             );
+                            let is_synthetic = event.is_synthetic_replay();
                             write_relay_trace(&format!(
-                                "event=non_target_suppression_check is_suppressed={} vk=0x{:02X} scan=0x{:02X}",
-                                is_suppressed, event.sample.virtual_key, event.sample.scan_code
+                                "event=non_target_suppression_check is_suppressed={} is_synthetic={} vk=0x{:02X} scan=0x{:02X}",
+                                is_suppressed, is_synthetic, event.sample.virtual_key, event.sample.scan_code
                             ));
-                            if is_suppressed {
+                            if is_suppressed && !is_synthetic {
                                 replay_suppressed_keyboard_sample(event.sample);
                             }
                         }
@@ -3221,11 +3179,13 @@ pub(crate) fn raw_keyboard_payload_is_sized(
     copied >= header_size.saturating_add(keyboard_size)
 }
 
+pub const KEYBOARD_SUPPRESSION_EXTRA_INFO: usize = 0x53555050; // "SUPP"
+
 #[cfg(windows)]
 fn replay_suppressed_keyboard_sample(sample: crate::keyboard_suppression::RawKeyboardSample) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+        MapVirtualKeyW, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+        KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, VIRTUAL_KEY,
     };
 
     let mut dw_flags = 0u32;
@@ -3236,15 +3196,21 @@ fn replay_suppressed_keyboard_sample(sample: crate::keyboard_suppression::RawKey
         dw_flags |= KEYEVENTF_EXTENDEDKEY.0;
     }
 
+    let scan_code = if sample.scan_code != 0 {
+        sample.scan_code
+    } else {
+        unsafe { MapVirtualKeyW(sample.virtual_key as u32, MAPVK_VK_TO_VSC) as u16 }
+    };
+
     let input = INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: VIRTUAL_KEY(sample.virtual_key),
-                wScan: sample.scan_code,
+                wScan: scan_code,
                 dwFlags: KEYBD_EVENT_FLAGS(dw_flags),
                 time: 0,
-                dwExtraInfo: 0,
+                dwExtraInfo: KEYBOARD_SUPPRESSION_EXTRA_INFO,
             },
         },
     };
@@ -3252,7 +3218,7 @@ fn replay_suppressed_keyboard_sample(sample: crate::keyboard_suppression::RawKey
     write_relay_trace(&format!(
         "event=replay_suppressed_key vk=0x{:02X} scan=0x{:02X} flags=0x{:04X} edge={}",
         sample.virtual_key,
-        sample.scan_code,
+        scan_code,
         sample.flags,
         if sample.is_break() { "up" } else { "down" }
     ));
@@ -3263,12 +3229,22 @@ fn replay_suppressed_keyboard_sample(sample: crate::keyboard_suppression::RawKey
 }
 
 #[cfg(windows)]
-struct RawInputKeyboardEvent {
-    is_target_device: bool,
-    transition: Option<ButtonTransition>,
-    sample: crate::keyboard_suppression::RawKeyboardSample,
-    relay_sample: keyboard_relay::RawKeyboardSample,
-    device_identity_available: bool,
+pub(crate) struct RawInputKeyboardEvent {
+    pub(crate) is_target_device: bool,
+    pub(crate) transition: Option<ButtonTransition>,
+    pub(crate) sample: crate::keyboard_suppression::RawKeyboardSample,
+    pub(crate) relay_sample: keyboard_relay::RawKeyboardSample,
+    pub(crate) device_identity_available: bool,
+    pub(crate) extra_info: u32,
+}
+
+#[cfg(windows)]
+impl RawInputKeyboardEvent {
+    pub fn is_synthetic_replay(&self) -> bool {
+        !self.device_identity_available
+            || self.extra_info == (KEYBOARD_SUPPRESSION_EXTRA_INFO as u32)
+            || self.extra_info == (keyboard_relay_windows::REDSAMURAI_SELF_INJECT_MARKER as usize as u32)
+    }
 }
 
 #[cfg(windows)]
@@ -3408,6 +3384,7 @@ unsafe fn read_raw_input_event(
         sample,
         relay_sample,
         device_identity_available,
+        extra_info: keyboard.ExtraInformation,
     }))
 }
 

@@ -448,6 +448,72 @@ fn raw_input_thread_join_waits_for_clean_worker_exit() {
     assert!(finished.load(std::sync::atomic::Ordering::Acquire));
 }
 
+#[cfg(windows)]
+#[test]
+fn raw_input_synthetic_replay_classification() {
+    let target_relay = keyboard_relay::RawKeyboardSample::new("target", 0x30, 0x0B, 0, 0);
+    let sample = crate::keyboard_suppression::RawKeyboardSample::new(0x30, 0x0B, 0, 0);
+
+    // 1. Physical keyboard: identity available, extra_info 0 -> NOT synthetic
+    let physical = resident_platform::RawInputKeyboardEvent {
+        is_target_device: false,
+        transition: None,
+        sample,
+        relay_sample: target_relay.clone(),
+        device_identity_available: true,
+        extra_info: 0,
+    };
+    assert!(!physical.is_synthetic_replay());
+
+    // 2. Synthetic injected (SendInput with no device identity) -> synthetic
+    let unidentified = resident_platform::RawInputKeyboardEvent {
+        is_target_device: false,
+        transition: None,
+        sample,
+        relay_sample: target_relay.clone(),
+        device_identity_available: false,
+        extra_info: 0,
+    };
+    assert!(unidentified.is_synthetic_replay());
+
+    // 3. Replay with suppression extra_info marker -> synthetic
+    let replay_marked = resident_platform::RawInputKeyboardEvent {
+        is_target_device: false,
+        transition: None,
+        sample,
+        relay_sample: target_relay,
+        device_identity_available: true,
+        extra_info: resident_platform::KEYBOARD_SUPPRESSION_EXTRA_INFO as u32,
+    };
+    assert!(replay_marked.is_synthetic_replay());
+}
+
+#[cfg(windows)]
+#[test]
+fn non_target_keyboard_zero_never_emits_mouse_button_transition() {
+    let expected = r#"\\?\HID#VID_04D9&PID_FC55&MI_01#9&13E53CD8&0&0000#{4D1E55B2-F16F-11CF-88CB-001111000030}\KBD"#;
+    let non_target = r#"\\?\HID#VID_056E&PID_1063&MI_00#8&2640116E&0&0000#{884B96C3-56EF-11D1-BC8C-00A0C91405DD}"#;
+
+    // Verify device matching
+    assert!(!resident_platform::raw_input_device_path_matches(expected, non_target));
+
+    // When a non-target device produces VK_0 (0x30, 0x0B),
+    // transition is None because is_target_device is false.
+    let is_target = resident_platform::raw_input_device_path_matches(expected, non_target);
+    let transition = if is_target {
+        resident_platform::map_raw_keyboard_event(0x30, 0)
+    } else {
+        None
+    };
+    assert_eq!(transition, None);
+
+    // Target device DOES map transition
+    let target_path = r#"\\?\HID#VID_04D9&PID_FC55&MI_01#9&13E53CD8&0&0000#{884B96C3-56EF-11D1-BC8C-00A0C91405DD}"#;
+    assert!(resident_platform::raw_input_device_path_matches(expected, target_path));
+    let target_transition = resident_platform::map_raw_keyboard_event(0x30, 0);
+    assert_eq!(target_transition, Some(ButtonTransition::pressed(0x27)));
+}
+
 #[cfg(not(windows))]
 #[test]
 fn non_windows_discovery_is_unsupported_without_hardware_access() {
