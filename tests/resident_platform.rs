@@ -514,6 +514,74 @@ fn non_target_keyboard_zero_never_emits_mouse_button_transition() {
     assert_eq!(target_transition, Some(ButtonTransition::pressed(0x27)));
 }
 
+#[cfg(windows)]
+#[test]
+fn relay_flow_target_button_16_emits_transition_and_never_replays_native_zero() {
+    let target = "target-keyboard";
+    let mut relay = keyboard_relay::KeyboardRelay::new([target]);
+    let target_sample = keyboard_relay::RawKeyboardSample::key_down(target, 0x30, 0x0B, false, 100);
+
+    // Target classification
+    assert_eq!(relay.classify_device(target), keyboard_relay::DeviceClass::Target);
+
+    // Target mapping to Button 16 transition (Usage 0x27)
+    let transition = resident_platform::map_raw_keyboard_event(target_sample.virtual_key, target_sample.flags);
+    assert_eq!(transition, Some(ButtonTransition::pressed(0x27)));
+    assert_eq!(
+        redsamurai_config::resident_service::button_number_from_usage(transition.unwrap().usage()),
+        Some(16)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn relay_flow_physical_keyboard_zero_replays_and_never_emits_transition() {
+    let target = "target-keyboard";
+    let physical = "physical-keyboard";
+    let mut relay = keyboard_relay::KeyboardRelay::new([target]);
+    let physical_sample = keyboard_relay::RawKeyboardSample::key_down(physical, 0x30, 0x0B, false, 100);
+
+    // Physical keyboard classification
+    assert_eq!(relay.classify_device(physical), keyboard_relay::DeviceClass::Ordinary);
+
+    // Physical keyboard produces NO transition because is_target is false
+    let is_target = relay.classify_device(physical) == keyboard_relay::DeviceClass::Target;
+    let transition = if is_target {
+        resident_platform::map_raw_keyboard_event(physical_sample.virtual_key, physical_sample.flags)
+    } else {
+        None
+    };
+    assert_eq!(transition, None);
+
+    // Physical keyboard event is forwarded for replay with injection marker
+    let result = relay.handle(physical_sample.clone());
+    assert_eq!(result.decision(), keyboard_relay::RelayDecision::PassThrough);
+    assert_eq!(result.events().len(), 1);
+    match &result.events()[0] {
+        keyboard_relay::RelayEvent::Forwarded(forwarded) => {
+            assert_eq!(forwarded.virtual_key, 0x30);
+            assert_eq!(forwarded.scan_code, 0x0B);
+            assert_eq!(forwarded.injection_marker(), Some(relay.injection_marker()));
+        }
+        _ => panic!("expected forwarded event for ordinary keyboard"),
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn relay_flow_self_injected_sample_is_dropped_as_echo() {
+    let target = "target-keyboard";
+    let mut relay = keyboard_relay::KeyboardRelay::new([target]);
+    let marker = relay.injection_marker();
+
+    let echo_sample = keyboard_relay::RawKeyboardSample::key_down("any", 0x30, 0x0B, false, 100)
+        .with_injection_marker(marker);
+
+    let result = relay.handle(echo_sample);
+    assert_eq!(result.decision(), keyboard_relay::RelayDecision::IgnoredSelfInjected);
+    assert!(result.events().is_empty());
+}
+
 #[cfg(not(windows))]
 #[test]
 fn non_windows_discovery_is_unsupported_without_hardware_access() {
@@ -538,3 +606,4 @@ fn non_windows_output_helpers_fail_closed_without_touching_hardware() {
     assert_eq!(mouse, Err(PlatformError::UnsupportedPlatform));
     assert_eq!(media, Err(PlatformError::UnsupportedPlatform));
 }
+

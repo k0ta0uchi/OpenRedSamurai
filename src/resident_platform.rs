@@ -2811,17 +2811,11 @@ unsafe extern "system" fn raw_input_window_proc(
                             );
                             if !is_suppressed {
                                 suppression_state.observe_target(event.sample);
-                            } else if !event.sample.is_break() {
-                                cancel_suppressed_hardware_key(event.sample);
                             }
                             if let Some(transition) = event.transition {
                                 let _ = (*state).sender.send(Ok(transition));
                             }
                         } else {
-                            // Non-target device (e.g. physical keyboard).
-                            // Because the low-level hook passes the key through, it is already
-                            // delivered natively to the foreground application.
-                            // We do NOT emit mouse button transitions and do NOT replay.
                             write_relay_trace(&format!(
                                 "event=non_target_keyboard_pass vk=0x{:02X} scan=0x{:02X}",
                                 event.sample.virtual_key, event.sample.scan_code
@@ -3044,8 +3038,14 @@ fn relay_handle_raw_event(
 
     let sample = event.relay_sample;
     let source_class = relay.core.classify_device(sample.device_id.clone());
+    let is_target = event.is_target_device || source_class == keyboard_relay::DeviceClass::Target;
+
+    if is_target && source_class != keyboard_relay::DeviceClass::Target {
+        relay.core.set_target_device(sample.device_id.clone(), true);
+    }
+
     if relay.observe_only {
-        if source_class == keyboard_relay::DeviceClass::Target && event.transition.is_some() {
+        if is_target && event.transition.is_some() {
             write_relay_trace(&format!(
                 "event=keyboard_relay_target path={} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X} edge={}",
                 sample.device_id,
@@ -3066,7 +3066,7 @@ fn relay_handle_raw_event(
         ));
         return Ok(());
     }
-    if source_class == keyboard_relay::DeviceClass::Target {
+    if is_target {
         if let Some(transition) = event.transition {
             write_relay_trace(&format!(
                 "event=keyboard_relay_target path={} vk=0x{:02X} scan=0x{:02X} flags=0x{:04X} edge={}",
@@ -3178,52 +3178,6 @@ pub(crate) fn raw_keyboard_payload_is_sized(
 }
 
 pub const KEYBOARD_SUPPRESSION_EXTRA_INFO: usize = 0x53555050; // "SUPP"
-
-#[cfg(windows)]
-fn cancel_suppressed_hardware_key(sample: crate::keyboard_suppression::RawKeyboardSample) {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-        KEYEVENTF_KEYUP, VK_BACK,
-    };
-
-    if sample.is_break() {
-        return;
-    }
-
-    let down = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VK_BACK,
-                wScan: 0x0E,
-                dwFlags: KEYBD_EVENT_FLAGS(0),
-                time: 0,
-                dwExtraInfo: KEYBOARD_SUPPRESSION_EXTRA_INFO,
-            },
-        },
-    };
-    let up = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VK_BACK,
-                wScan: 0x0E,
-                dwFlags: KEYEVENTF_KEYUP,
-                time: 0,
-                dwExtraInfo: KEYBOARD_SUPPRESSION_EXTRA_INFO,
-            },
-        },
-    };
-
-    write_relay_trace(&format!(
-        "event=cancel_suppressed_hardware_key vk=0x{:02X} scan=0x{:02X}",
-        sample.virtual_key, sample.scan_code
-    ));
-
-    unsafe {
-        let _ = SendInput(&[down, up], std::mem::size_of::<INPUT>() as i32);
-    }
-}
 
 #[cfg(windows)]
 pub(crate) struct RawInputKeyboardEvent {
@@ -3469,21 +3423,20 @@ pub fn open_resident_input_device() -> Result<ResidentInputDevice, PlatformError
 #[cfg(windows)]
 /// Open the resident collection for the long-lived service.
 ///
-/// Foreground keyboard suppression for customized side keys is enabled by
-/// default for the service unless `REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION=1`
-/// is set or all-keyboard relay is active. The diagnostic all-keyboard relay
-/// is opt-in through `REDSAMURAI_ENABLE_KEYBOARD_RELAY=1`.
-/// The `initial_suppressed` keys are passed directly to hook creation so
-/// suppression is active from the very first hook callback without a startup race.
+/// Uses the all-keyboard Raw Input relay (`RIDEV_NOLEGACY`) by default so that
+/// the target mouse device's hardware keystrokes (such as Button 16's factory '0')
+/// are completely suppressed at the Win32 subsystem level without emitting legacy
+/// keyboard messages, while physical keyboard inputs are safely replayed unchanged.
+/// Can be opted out with `REDSAMURAI_DISABLE_KEYBOARD_RELAY=1`.
 pub fn open_resident_input_device_for_service(
     initial_suppressed: &[(u16, u32)],
 ) -> Result<ResidentInputDevice, PlatformError> {
-    let all_keyboard_relay = keyboard_relay_windows::relay_opt_in_requested();
-    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
-    let suppression_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_SUPPRESSION")
+    let relay_disabled = std::env::var("REDSAMURAI_DISABLE_KEYBOARD_RELAY")
         .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
         .unwrap_or(false);
-    let suppress_legacy = !all_keyboard_relay && !suppression_disabled;
+    let all_keyboard_relay = !relay_disabled;
+    let observe_only = all_keyboard_relay && keyboard_relay_windows::relay_observe_only_requested();
+    let suppress_legacy = !all_keyboard_relay;
     open_resident_input_device_internal(
         suppress_legacy,
         all_keyboard_relay,
